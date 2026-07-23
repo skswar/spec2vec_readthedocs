@@ -63,6 +63,10 @@
     "primary": {
       "type": "github",
       "href": "https://github.com/URseismology/Spec2Vec"
-    }
+    },
+    "links": []
+  },
+  "background": {
+    "decoration": "windows"
   }
 }
