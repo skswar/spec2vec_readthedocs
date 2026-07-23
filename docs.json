@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "name": "Spec2Vec",
-  "theme": "palm",
+  "theme": "almond",
   "colors": {
     "primary": "#1A6B8A",
     "light": "#E8F4F8",
