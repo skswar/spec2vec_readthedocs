@@ -6,6 +6,8 @@ description: "Reference for stft_basic_spectogram and cwt_simple: convert 1D tim
 
 Spec2Vec includes built-in functions to convert 1D time-series signals into 2D time-frequency representations (TFRs). These representations expose the frequency content of your signal as a function of time and are the recommended input format when you want to extract richer spatial and textural features using the Hilbert curve flattening path in `GISQAPipeline`. Both functions live in a single module — import them as shown below.
 
+Note: other than STFT and CWT there are other TFR generation functions such as MODWT, MOWPT which can also be used to generate 2D time-frequency/mode representations of a signal. 
+
 ## Import
 
 ```python
@@ -74,23 +76,23 @@ print(spec.shape)  # (n_freq, n_time)
   Maximum frequency (Hz) to retain in the output spectrogram. Frequency bins above this value are discarded. Should not exceed the Nyquist frequency (`sr / 2`).
 </ParamField>
 
-<ParamField path="max_normalize" type="bool" default="True">
+<ParamField path="max_normalize" default="True" type="bool">
   When `True`, applies `MinMaxScaler` to rescale all spectrogram values into `normalize_range` before the log transform step. Disable this if you want to preserve the original magnitude scale.
 </ParamField>
 
-<ParamField path="powerlog" type="bool" default="True">
+<ParamField path="powerlog" default="True" type="bool">
   When `True`, converts the magnitude spectrogram to a decibel scale using `10 * log10(values)`. This compresses the dynamic range and is recommended for most geophysical signals.
 </ParamField>
 
-<ParamField path="normalize_range" type="tuple" default="(1e-8, 1)">
+<ParamField path="normalize_range" default="(1e-8, 1)" type="tuple">
   The `(min, max)` range used by `MinMaxScaler` during normalization. The non-zero lower bound prevents `log10(0)` errors when `powerlog=True`.
 </ParamField>
 
-<ParamField path="vmin_percentile" type="int" default="5">
+<ParamField path="vmin_percentile" default="5" type="int">
   Lower percentile for clipping the spectrogram. Values below this percentile are set to the percentile value, suppressing low-energy background noise.
 </ParamField>
 
-<ParamField path="vmax_percentile" type="int" default="100">
+<ParamField path="vmax_percentile" default="100" type="int">
   Upper percentile for clipping the spectrogram. Values above this percentile are capped, reducing the influence of transient amplitude spikes.
 </ParamField>
 
@@ -148,55 +150,55 @@ print(scalogram.shape)  # (n_scales, n_time)
   1D input time-series signal. Must be one-dimensional — the function will raise an `AssertionError` if a 2D array is passed.
 </ParamField>
 
-<ParamField path="sr" type="int" default="1000">
+<ParamField path="sr" default="1000" type="int">
   Sampling rate in Hz. Used to compute the time vector and sampling period when `dt` is `None`.
 </ParamField>
 
-<ParamField path="dt" type="float or None" default="None">
+<ParamField path="dt" default="None" type="float or None">
   Sampling period in seconds. When `None`, it is computed automatically from `sr`. Provide an explicit value if your signal has an irregular or non-standard sampling period.
 </ParamField>
 
-<ParamField path="fscale" type="dict" default="{'start': 1, 'end': 512, 'num': 100}">
+<ParamField path="fscale" default="{'start': 1, 'end': 512, 'num': 100}" type="dict">
   Dictionary specifying the scale (frequency) range to compute. The `'start'` and `'end'` keys define the minimum and maximum scale values; `'num'` defines the step size (for `'linear'` mode) or number of points (for `'log'` mode). Adjust `'end'` to match the Nyquist frequency of your signal.
 </ParamField>
 
-<ParamField path="wavelet" type="str" default="'cmor1.5-1.0'">
+<ParamField path="wavelet" default="'cmor1.5-1.0'" type="str">
   Name of the continuous wavelet in PyWavelets syntax. The complex Morlet wavelet `'cmor1.5-1.0'` is the default and is well-suited for oscillatory geophysical signals. Other valid choices include `'mexh'` (Mexican hat) or `'morl'` (Morlet).
 </ParamField>
 
-<ParamField path="vmin_percentile" type="int" default="2">
+<ParamField path="vmin_percentile" default="2" type="int">
   Lower percentile for clipping the output scalogram. Values below this percentile are set to the percentile value.
 </ParamField>
 
-<ParamField path="vmax_percentile" type="int" default="98">
+<ParamField path="vmax_percentile" default="98" type="int">
   Upper percentile for clipping the output scalogram.
 </ParamField>
 
-<ParamField path="f_min" type="int" default="0">
+<ParamField path="f_min" default="0" type="int">
   Minimum frequency (Hz) to retain in the output. Rows corresponding to lower frequencies are removed.
 </ParamField>
 
-<ParamField path="f_max" type="int or None" default="None">
+<ParamField path="f_max" default="None" type="int or None">
   Maximum frequency (Hz) to retain. When `None`, all frequencies up to the maximum scale are kept.
 </ParamField>
 
-<ParamField path="max_normalize" type="bool" default="True">
+<ParamField path="max_normalize" default="True" type="bool">
   When `True`, applies `MinMaxScaler` to rescale values into `normalize_range`.
 </ParamField>
 
-<ParamField path="fscaletype" type="str" default="'linear'">
+<ParamField path="fscaletype" default="'linear'" type="str">
   Frequency scale spacing. Use `'linear'` for uniform spacing across the frequency axis or `'log'` for logarithmically spaced scales (useful when you want equal resolution per octave, as in musical or seismic analysis).
 </ParamField>
 
-<ParamField path="powerlog" type="bool" default="False">
+<ParamField path="powerlog" default="False" type="bool">
   When `True`, applies `10 * log10` to the magnitude scalogram. Defaults to `False` for CWT because log scaling is less common in wavelet-based analysis.
 </ParamField>
 
-<ParamField path="normalize_range" type="tuple" default="(1e-8, 1)">
+<ParamField path="normalize_range" default="(1e-8, 1)" type="tuple">
   The `(min, max)` range for `MinMaxScaler` normalization.
 </ParamField>
 
-<ParamField path="decimate_factor" type="int or None" default="None">
+<ParamField path="decimate_factor" default="None" type="int or None">
   When set, reduces the time axis of the scalogram by keeping every `decimate_factor`-th column. Useful for very long signals where the CWT output would otherwise be too large to process efficiently.
 </ParamField>
 
@@ -217,8 +219,6 @@ print(scalogram.shape)  # (n_scales, n_time)
 <ResponseField name="cwtmatr_cmplx" type="np.ndarray">
   Raw complex CWT coefficient matrix before magnitude extraction. Useful if you need phase information for custom downstream processing.
 </ResponseField>
-
----
 
 ## Choosing Between STFT and CWT
 
