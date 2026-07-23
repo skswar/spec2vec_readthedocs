@@ -14,6 +14,7 @@ Before any metrics are computed, a 1D time-series must be mapped into a 2D time-
   <Card title="STFT spectrogram" icon="chart-bar">
     `stft_basic_spectogram()` uses SciPy's Short-Time Fourier Transform to produce a magnitude or decibel-scale spectrogram. Key parameters include the window length (`nperseg`), fractional overlap, window function, and frequency bounds `[f_min, f_max]`. This is the recommended starting point for most geophysical waveforms.
   </Card>
+
   <Card title="CWT scalogram" icon="wave-square">
     `cwt_simple()` uses PyWavelets to compute a Continuous Wavelet Transform scalogram. It supports arbitrary mother wavelets (e.g., `cmor1.5-1.0`) and both linear and logarithmic frequency scales. CWT captures transient features at multiple resolutions and is preferred for non-stationary signals.
   </Card>
@@ -57,9 +58,11 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
   <Card title="Information-theoretic & entropy" icon="circle-info">
     These metrics quantify **disorder, predictability, and structural complexity** in the signal. A white-noise spectrogram will have near-maximum permutation entropy; a narrowband monochromatic tone will have very low entropy. This family includes measures from both `antropy` (e.g., permutation entropy, SVD entropy, approximate entropy, sample entropy, Hjorth mobility/complexity) and `ordpy` (e.g., Fisher–Shannon information, Rényi complexity-entropy, Tsallis complexity-entropy, weighted permutation entropy, missing ordinal patterns).
   </Card>
+
   <Card title="Complexity & fractal dimension" icon="chart-scatter">
     These metrics quantify **self-similarity and roughness** of the signal trace. Higher fractal dimension indicates a rougher, more complex waveform. This family includes Petrosian FD, Katz FD, Higuchi FD, detrended fluctuation analysis (DFA), and Lempel-Ziv complexity — all computed via `antropy` and `tsfel`.
   </Card>
+
   <Card title="Statistical moments & distribution" icon="sigma">
     These metrics capture the **amplitude distribution** of spectrogram pixel values: mean, variance, skewness, kurtosis, root mean square, interquartile range, ECDF percentiles, histogram mode, and more. They are computed via `tsfel` and describe the overall energy budget and shape of the amplitude distribution.
   </Card>
@@ -68,7 +71,7 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
 ### Entropy & ordpy features in detail
 
 | Feature | Library | What it measures |
-|---|---|---|
+| --- | --- | --- |
 | `permutation_entropy_antropy` | antropy | Randomness of ordinal patterns in the trace |
 | `spectral_entropy_antropy` | antropy | Flatness of the power spectral density |
 | `svd_entropy_antropy` | antropy | Complexity of the trajectory matrix via SVD |
@@ -77,7 +80,7 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
 | `hjorth_mobility_antropy` | antropy | Mean frequency estimate of the signal |
 | `hjorth_complexity_antropy` | antropy | Deviation of shape from a pure sine wave |
 | `num_zerocross_antropy` | antropy | Rate of zero-crossings (loosely tracks dominant frequency) |
-| `normalized_permutation_entropy_ordpy` | ordpy | Permutation entropy normalised to [0,1] |
+| `normalized_permutation_entropy_ordpy` | ordpy | Permutation entropy normalised to \[0,1\] |
 | `statistical_complexity_entropy_ordpy` | ordpy | Jensen–Shannon divergence from uniform distribution |
 | `fisher_shannon_ordpy` | ordpy | Fisher information weighted by ordinal pattern probabilities |
 | `global_node_entropy_ordpy` | ordpy | Entropy of the ordinal network node degree distribution |
@@ -90,7 +93,7 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
 ### Fractal & complexity features in detail
 
 | Feature | Library | What it measures |
-|---|---|---|
+| --- | --- | --- |
 | `petrosian_fd_antropy` | antropy | Rapid estimate of fractal dimension from zero-crossing rate |
 | `katz_fd_antropy` | antropy | Fractal dimension from maximum waveform extent vs. mean step |
 | `higuchi_fd_antropy` | antropy | Precise fractal dimension via finite differences at multiple scales |
@@ -99,7 +102,7 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
 
 ## Best features
 
-When you set `is_best_features=1`, Spec2Vec returns only the five metrics that have been empirically identified as the most discriminating across geophysical signal datasets:
+When you set `is_best_features=1`, Spec2Vec returns only the five features that can be helpful in discriminating across different geophysical signal datasets:
 
 ```text
 detrended_fluctuation_antropy
@@ -109,7 +112,7 @@ svd_entropy_antropy
 approximate_entropy_antropy
 ```
 
-This preset is ideal for fast exploratory clustering where you want a compact embedding without computing all 50+ features. For production pipelines or when interpretability of every dimension matters, set `is_best_features=0` and optionally pass a `metrics_list` to select exactly the features you need.
+This preset is ideal for fast exploratory clustering where you want a compact embedding without computing all 50\+ features. For production pipelines or when interpretability of every dimension matters, set `is_best_features=0` and optionally pass a `metrics_list` to select exactly the features you need.
 
 ## The resulting vector
 

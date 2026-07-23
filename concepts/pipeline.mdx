@@ -4,7 +4,7 @@ sidebarTitle: "Pipeline"
 description: "Use GISQAPipeline to extract named spectral features from signals or spectrograms, with controls for normalization, embedding depth, and feature selection."
 ---
 
-`GISQAPipeline` is the main entry point to Spec2Vec. It is a high-level class that wraps both pointwise and pairwise feature extraction into a clean API, letting you go from a list of raw arrays to a labelled pandas DataFrame in a single method call. You instantiate it once and then call whichever extraction method fits your workflow — there is no configuration file to edit and no subclassing required.
+`GISQAPipeline` is the main entry point to Spec2Vec. It is a high-level class that wraps both pointwise (texture and stat) and pairwise feature (spatial) extraction into a clean API, letting you go from a list of raw arrays to a labelled pandas DataFrame in a single method call. You instantiate it once and then call whichever extraction method fits your workflow — there is no configuration file to edit and no subclassing required.
 
 ```python
 from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
@@ -25,11 +25,11 @@ df = giq.compute_pointwise_metrics_from_spec(
     spec_names,
     spec_images,
     is_hilbertize=1,
-    is_normalize_stat=1,   # default: normalise statistical features
+    is_normalize_stat=0,   # 1: normalise statistical features
     is_normalize_entropy=0,
-    is_best_features=1,    # default: return only the top 5 features
-    ordpydx=7,
-    antropydx=5,
+    is_best_features=0,    # 1: return only the top 5 features
+    ordpydx=6,
+    antropydx=6,
     metrics_list=None,
     hilbert_locs=None
 )
@@ -45,35 +45,35 @@ df = giq.compute_pointwise_metrics_from_spec(
   A list of NumPy arrays to process. Each element can be a **1D array** (raw time-series) or a **2D array** (spectrogram or scalogram). All arrays in the list may have different shapes — the pipeline processes them one at a time.
 </ParamField>
 
-<ParamField path="is_hilbertize" type="int" default="1">
+<ParamField path="is_hilbertize" default="1" type="int">
   Set to `1` to enable Hilbert curve flattening for 2D spectrogram inputs. The pipeline automatically selects the standard Hilbert curve for square power-of-2 images and the generalised Gilbertised curve for rectangular images. Set to `0` when passing 1D time-series arrays directly.
 </ParamField>
 
-<ParamField path="is_normalize_stat" type="int" default="1">
+<ParamField path="is_normalize_stat" default="1" type="int">
   Set to `1` to normalise the flattened signal to the range `[-1, 1]` before computing **statistical features** (mean, variance, kurtosis, etc.). Normalisation is performed with `MinMaxScaler`. Normalising statistical features can improve comparability across signals with different amplitude scales. Enabled by default.
 </ParamField>
 
-<ParamField path="is_normalize_entropy" type="int" default="0">
+<ParamField path="is_normalize_entropy" default="0" type="int">
   Set to `1` to normalise the flattened signal before computing **entropy and fractal features** (permutation entropy, DFA, etc.). Note that some entropy measures — particularly `svd_entropy_antropy` — are sensitive to the amplitude scaling of the input, so evaluate whether normalisation helps or hurts for your specific dataset.
 </ParamField>
 
-<ParamField path="is_best_features" type="int" default="1">
+<ParamField path="is_best_features" default="1" type="int">
   When `1` (the default), the pipeline returns only the five most discriminating features identified across geophysical datasets: `detrended_fluctuation_antropy`, `fisher_shannon_ordpy`, `Lempel-Ziv complexity`, `svd_entropy_antropy`, and `approximate_entropy_antropy`. Set to `0` to compute all available features. When `metrics_list` is also provided, `metrics_list` takes precedence regardless of this flag.
 </ParamField>
 
-<ParamField path="ordpydx" type="int" default="7">
+<ParamField path="ordpydx" default="7" type="int">
   The embedding dimension (`dx`) passed to all `ordpy` feature computations. Controls the length of ordinal patterns evaluated (pattern length = `ordpydx`). Recommended range: **4–8**. Higher values capture longer-range correlations but increase computation time and require longer input signals.
 </ParamField>
 
-<ParamField path="antropydx" type="int" default="5">
+<ParamField path="antropydx" default="5" type="int">
   The embedding dimension (`dx`) passed to all `antropy` entropy and fractal computations. Affects permutation entropy, SVD entropy, approximate entropy, and sample entropy. Recommended range: **4–6**. Must be consistent across your dataset for results to be comparable.
 </ParamField>
 
-<ParamField path="metrics_list" type="list[str] | None" default="None">
+<ParamField path="metrics_list" default="None" type="list[str] | None">
   An explicit list of feature names to compute. When provided, only the listed features are extracted — all others are skipped, which substantially speeds up processing on large datasets. Feature names must use the canonical suffixed form: `_antropy`, `_ordpy`, or the plain TSFEL name (e.g., `'Lempel-Ziv complexity'`). When `None`, all features are computed (unless `is_best_features=1`).
 </ParamField>
 
-<ParamField path="hilbert_locs" type="np.ndarray | None" default="None">
+<ParamField path="hilbert_locs" default="None" type="np.ndarray | None">
   Pre-computed Hilbert curve index array of shape `(N_pixels, 2)`, where each row is a `(row, col)` coordinate. If you are processing a large batch of spectrograms that all have the same shape, pass a pre-computed index here to avoid re-running the curve generation on every call. Generate it once with `HelperFunc.gilbertize_image_optimized(width=H, height=W)`.
 </ParamField>
 
@@ -129,7 +129,7 @@ print(df.columns.tolist()) # All feature names plus 'label'
 
 ## Pairwise pipeline
 
-The pairwise pipeline, accessed through `execute_pairwise_pipleine()`, compares a target spectrogram against a pre-built **noise reference bank** to extract spatial zone metrics. It is more computationally expensive than the pointwise pipeline but provides richer discriminative features for noisy real-world data.
+The pairwise pipeline, accessed through `execute_pairwise_pipleine()`, compares a target spectrogram against a pre-built **noise reference bank** to extract spatial zone metrics. It provides discriminative features for noisy real-world data.
 
 <Note>
   The method is spelled `execute_pairwise_pipleine` (note the transposed letters in "pipeline") — this matches the current source exactly. Use this spelling when calling the method in your own code.
@@ -139,7 +139,7 @@ The pairwise pipeline, accessed through `execute_pairwise_pipleine()`, compares 
 
 <Steps>
   <Step title="Histogram alignment">
-    The amplitude distribution of the target spectrogram is compared against every entry in the noise bank using cross-correlation and differential evolution optimisation. The noise entry whose aligned distribution best matches the target is selected as the reference. The optimal scaling factor stretches the noise distribution to overlap with the target, effectively isolating the signal of interest from background noise.
+    The amplitude distribution of the target spectrogram is compared against every entry in the noise bank using cross-correlation and differential evolution optimization. The noise entry whose aligned distribution best matches the target is selected as the reference. The optimal scaling factor stretches the noise distribution to overlap with the target, effectively isolating the signal of interest from background noise.
   </Step>
   <Step title="GMM labeling">
     A Gaussian Mixture Model (GMM) is fitted to the residual distribution — the portion of the spectrogram that exceeds the noise threshold. The GMM components define cut thresholds along the intensity axis, and every pixel in the spectrogram is assigned an integer energy label (0 = noise floor, 1 = low signal, 2 = moderate signal, and so on).
@@ -152,33 +152,23 @@ The pairwise pipeline, accessed through `execute_pairwise_pipleine()`, compares 
 ### When to use pairwise vs pointwise
 
 | Consideration | Pointwise | Pairwise |
-|---|---|---|
+| --- | --- | --- |
 | Requires noise bank | No | Yes (HDF5 file) |
 | Computation time | Fast | Slow (optimisation loop) |
 | Works on 1D time-series | Yes | No (needs 2D spectrogram) |
 | Captures spatial structure | Indirectly | Explicitly |
-| Best for | Exploration, large batches | Production, noisy real data |
 
 <Warning>
-  The pairwise pipeline requires a pre-built noise bank in HDF5 format. You can generate one using `GISQAPipeline.compute_imgbank_dict()` or `compute_noisebnk_metrics()`. Without it, the histogram alignment step has no reference to align against.
+  The pairwise pipeline requires a pre-built noise bank in HDF5 format. You can generate one using `GISQAPipeline.compute_imgbank_dict()` or `compute_noisebnk_metrics()`. Without it, the histogram alignment step has no reference to align against. The DAS application notebook shows exactly how to generate a noise reference and use for spatial metrics computation.
 </Warning>
 
 ---
 
 ## Normalization options
 
-Two independent normalisation flags let you control whether the flattened signal trace is rescaled before metric computation.
+Two independent normalization flags let you control whether the flattened signal trace is rescaled before metric computation.
 
-<CardGroup cols={2}>
-  <Card title="is_normalize_stat" icon="ruler">
-    Scales the trace to `[-1, 1]` before computing **statistical features** (mean, variance, RMS, percentiles, etc.). Use this when your signals have very different amplitude ranges and you want the statistical features to reflect distributional shape rather than absolute scale.
-  </Card>
-  <Card title="is_normalize_entropy" icon="lock">
-    Scales the trace to `[-1, 1]` before computing **entropy and fractal features**. Most entropy measures are already normalised by construction (permutation entropy returns values in [0,1]), but amplitude-sensitive measures like `svd_entropy_antropy` may benefit. Test on your data before enabling.
-  </Card>
-</CardGroup>
-
-`is_normalize_stat` defaults to `1` (enabled) while `is_normalize_entropy` defaults to `0` (disabled). You can set them independently — for example, `is_normalize_stat=0, is_normalize_entropy=0` disables both, or `is_normalize_stat=1, is_normalize_entropy=1` enables both branches.
+`is_normalize_stat` defaults to `1` (enabled) while `is_normalize_entropy` defaults to `0` (disabled). You can set them independently — for example, `is_normalize_stat=0, is_normalize_entropy=0` disables both. For random forest types applications these normalization steps are not needed and recommended to be set to 0.
 
 ---
 

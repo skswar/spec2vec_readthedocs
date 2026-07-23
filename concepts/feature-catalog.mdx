@@ -4,7 +4,7 @@ sidebarTitle: "Feature Catalog"
 description: "Browse all 50+ spectral features available in Spec2Vec, organized by category: entropy, complexity, fractal dimension, and statistical measures."
 ---
 
-Spec2Vec computes over 50 named features from any input signal. Each feature is a mathematically defined scalar that captures a distinct aspect of the signal's structure — from the randomness of its ordinal patterns, to the roughness of its waveform, to the shape of its amplitude distribution. This page catalogs every available metric, organised by feature family, with the canonical name you pass to `metrics_list` and a description of what it measures.
+Spec2Vec computes over 50 named features from any input signal. Each feature is a mathematically defined scalar that captures a distinct aspect of the signal's structure — from the randomness of its ordinal patterns, to the roughness of its waveform, to the shape of its amplitude distribution. This page catalogs every available metric, organized by feature family, with the canonical name you pass to `metrics_list` and a description of what it measures.
 
 <Tabs>
   <Tab title="Entropy & Ordpy">
@@ -13,7 +13,7 @@ Spec2Vec computes over 50 named features from any input signal. Each feature is 
     ### antropy entropy features
 
     | Feature name | Description |
-    |---|---|
+    | --- | --- |
     | `permutation_entropy_antropy` | Measures the randomness of ordinal rank patterns in the signal; high values indicate a more disordered, noise-like trace. |
     | `spectral_entropy_antropy` | Quantifies the flatness of the Welch power spectral density; a perfectly flat spectrum (white noise) yields maximum spectral entropy. |
     | `svd_entropy_antropy` | Applies Singular Value Decomposition to the time-delay embedding matrix and measures the entropy of the resulting singular value spectrum, reflecting the effective dimensionality of the signal's dynamics. |
@@ -26,8 +26,8 @@ Spec2Vec computes over 50 named features from any input signal. Each feature is 
     ### ordpy features
 
     | Feature name | Description |
-    |---|---|
-    | `normalized_permutation_entropy_ordpy` | Permutation entropy normalised to [0, 1] using the maximum possible entropy; directly comparable across signals of different lengths. |
+    | --- | --- |
+    | `normalized_permutation_entropy_ordpy` | Permutation entropy normalised to \[0, 1\] using the maximum possible entropy; directly comparable across signals of different lengths. |
     | `statistical_complexity_entropy_ordpy` | The Jensen–Shannon divergence between the observed ordinal probability distribution and the uniform distribution, scaled by the normalised permutation entropy; high values indicate structured complexity. |
     | `fisher_shannon_ordpy` | The Fisher information measure weighted by the ordinal pattern probabilities; sensitive to fine local structure in the time series and a strong discriminator for geophysical signals. |
     | `global_node_entropy_ordpy` | Entropy of the degree distribution in the ordinal network, where nodes are ordinal patterns and edges represent consecutive transitions. |
@@ -45,12 +45,11 @@ Spec2Vec computes over 50 named features from any input signal. Each feature is 
     | `tsallis_stat_complexity_long_ordpy` | Statistical complexity computed using Tsallis entropy at q = 1.5. |
     | `weighted_permutation_entropy_ordpy` | Permutation entropy where each ordinal pattern is weighted by the variance of the amplitude sub-sequence that generated it; less sensitive to low-amplitude fluctuations than standard permutation entropy. |
   </Tab>
-
   <Tab title="Fractal & Complexity">
     These features characterise the **self-similarity, roughness, and algorithmic compressibility** of the signal trace. All are computed on the Hilbert-flattened 1D array using the `antropy` and `tsfel` libraries.
 
     | Feature name | Library | Description |
-    |---|---|---|
+    | --- | --- | --- |
     | `petrosian_fd_antropy` | antropy | Rapid estimate of fractal dimension derived from the zero-crossing rate of the first derivative; computationally cheap but less precise than Higuchi. |
     | `katz_fd_antropy` | antropy | Fractal dimension estimated from the ratio of the total path length to the maximum distance between the first sample and any other sample; sensitive to amplitude extremes. |
     | `higuchi_fd_antropy` | antropy | Precise fractal dimension computed from the average finite-difference length at multiple time scales; the most robust fractal estimator available in the pipeline. |
@@ -61,12 +60,11 @@ Spec2Vec computes over 50 named features from any input signal. Each feature is 
       `detrended_fluctuation_antropy` and `Lempel-Ziv complexity` are both included in the `is_best_features=1` preset because they consistently rank among the most discriminating metrics for distinguishing geophysical signal types.
     </Note>
   </Tab>
-
   <Tab title="Statistical">
     These features describe the **amplitude distribution and energy statistics** of the signal trace. They are computed by `tsfel` and by direct NumPy operations on the flattened 1D array. When `is_normalize_stat=1`, the trace is scaled to `[-1, 1]` before these features are computed.
 
     | Feature name | Description |
-    |---|---|
+    | --- | --- |
     | `Absolute energy` | Sum of the squared sample values; proportional to the total signal energy. |
     | `Average power` | Mean squared value of the signal, equivalent to absolute energy divided by signal length. |
     | `ECDF Percentile_0` | The 25th percentile of the empirical cumulative distribution function of amplitude values. |
@@ -132,34 +130,6 @@ print(df.columns.tolist())
 ```
 
 ---
-
-## Best features preset
-
-Setting `is_best_features=1` is a shortcut that returns the five features with the strongest empirical discrimination across geophysical signal datasets. This preset is ideal for rapid prototyping, real-time pipelines, and cases where you want a compact embedding without evaluating all 50+ metrics.
-
-The five features returned are:
-
-| Feature | Family | Why it discriminates |
-|---|---|---|
-| `detrended_fluctuation_antropy` | Fractal | Captures the long-range correlation structure; directly reflects the noise colour (white vs. pink vs. red) of the background. |
-| `fisher_shannon_ordpy` | Entropy | Sensitive to local fine structure in ordinal patterns; differentiates transient events from stationary background. |
-| `Lempel-Ziv complexity` | Complexity | Model-free compressibility measure; impulsive events have much lower complexity than broadband noise. |
-| `svd_entropy_antropy` | Entropy | Reflects the effective degrees of freedom in the signal's trajectory; discriminates narrowband from broadband signals. |
-| `approximate_entropy_antropy` | Entropy | Regularity measure; periodic signals have near-zero approximate entropy while noise has high values. |
-
-```python
-giq = GISQAPipeline()
-df = giq.compute_pointwise_metrics_from_spec(
-    spec_names, spec_images,
-    is_hilbertize=1,
-    is_best_features=1,     # this is the default — returns only the top 5 features
-    ordpydx=7, antropydx=5,
-    is_normalize_stat=1, is_normalize_entropy=0,
-    metrics_list=None, hilbert_locs=None
-)
-
-print(df.shape)  # (N_signals, 6)  ← 5 features + 'label'
-```
 
 <Note>
   When `metrics_list` is provided at the same time as `is_best_features=1`, the explicit `metrics_list` takes precedence. The best-features preset is only applied when `metrics_list=None`.
