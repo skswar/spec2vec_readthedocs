@@ -7,40 +7,37 @@ description: "Step-by-step guide to processing fiber-optic DAS array data with S
 Spec2Vec can characterize Distributed Acoustic Sensing (DAS) array data before and after seismic event arrivals, enabling automated detection and characterization of wave arrivals across the full fiber array. By computing a unique spectral fingerprint for each fiber channel, you can compare pre-event background noise against post-event waveforms and quantify how earthquake energy propagates along the cable.
 
 <Note>
-**What you'll need before starting:**
+  **What you'll need before starting:**
 
-- A Python environment configured per the Installation guide
-- The `das_application.ipynb` notebook from the `das_application/` directory
-- The raw DAS dataset in HDF5 format (see Step 1 for download instructions)
+  - A Python environment configured per the Installation guide
+  - The `das_application.ipynb` notebook from the `das_application/` directory
+  - The raw DAS dataset in HDF5 format (see Step 1 for download instructions)
 </Note>
 
 ## Overview
 
 DAS systems turn a single fiber-optic cable into thousands of co-located seismometers. The resulting dataset is a 2D space–time array where one axis represents position along the cable (channel index) and the other represents time. These arrays are stored as HDF5 files, making them efficient to read selectively and process channel-by-channel. Spec2Vec treats each individual channel's time series as an independent signal, converts it to a Time-Frequency Representation (TFR), and extracts a compact feature vector — a spectral fingerprint — that captures the signal's information-theoretic, statistical, and spatial character.
 
-## Workflow Steps
+## Workflow Steps For Reproducability
 
 <Steps>
   <Step title="Download the data">
     Navigate to the `das_application/data/` directory and open `data_readme.md`. Follow the instructions there to download the raw HDF5 DAS dataset to your local machine. Place the downloaded file in a location you can easily reference in the next step.
   </Step>
-
   <Step title="Update file paths">
     Open `das_application/das_application.ipynb` in Jupyter. Near the top of the notebook, locate the path configuration variables and update each one to point to your local copy of the HDF5 data file and any output directories. All downstream cells read from these variables, so getting them right at the start prevents errors later.
   </Step>
-
   <Step title="Load and visualize the DAS data">
     Run the data-loading cells to read the HDF5 file into memory. The notebook will plot the full space–time panel — a heatmap showing strain or velocity amplitude as a function of channel number and time — alongside array-wide power spectra. These visualizations let you visually identify the earthquake arrival moveout across channels before you begin feature extraction.
   </Step>
-
-  <Step title="Generate spectrograms">
-    For each DAS channel's time series, convert the 1D signal to a 2D Time-Frequency Representation using either `stft_basic_spectogram()` for Short-Time Fourier Transform output or `cwt_simple()` for Continuous Wavelet Transform output. The STFT is generally faster; the CWT provides better time resolution at low frequencies. Both functions return frequency bins, time bins, and the 2D spectrogram array ready for Spec2Vec ingestion.
+  <Step title="Generate time-frequency 2D representations and noise reference">
+    For each DAS channel's time series, convert the 1D signal to a 2D Space-Frequency Representation. Also provides use the time and channel segments of the DAS data to prepare the pre-arrival noise reference file which will later be used for spatial feature extraction with the `pairwise` function.
   </Step>
-
   <Step title="Extract Spec2Vec features">
     Pass the list of spectrogram arrays to `GISQAPipeline.compute_pointwise_metrics_from_spec()`. The pipeline Hilbert-curve-flattens each 2D image, computes entropy, complexity, and statistical moment features along the resulting 1D sequence, and returns a tidy DataFrame where each row corresponds to one DAS channel and each column is a named spectral metric.
-  </Step>
 
+    Pass the  list of spectrogram and the noise reference path to the `execute_pairwise_pipleine`  function to generate the spatial features. 
+  </Step>
   <Step title="Compare pre- and post-event features">
     Use the feature DataFrame to directly compare spectral fingerprints computed on pre-arrival noise windows against those computed on post-arrival signal windows. Metrics such as permutation entropy or spectral entropy will shift detectably when coherent wave energy arrives, giving you a quantitative, channel-by-channel picture of the earthquake's propagation along the fiber.
   </Step>
