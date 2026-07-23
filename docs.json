@@ -68,5 +68,8 @@
   },
   "background": {
     "decoration": "windows"
+  },
+  "appearance": {
+    "default": "light"
   }
 }
