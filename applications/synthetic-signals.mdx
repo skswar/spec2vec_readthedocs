@@ -1,0 +1,55 @@
+---
+title: "Clustering Synthetic Geophysical Signals with Spec2Vec"
+sidebarTitle: "Synthetic Signals"
+description: "Validate Spec2Vec on synthetic geophysical waveforms representing T-phase earthquakes, Strombolian explosions, and surface wave dispersions."
+---
+
+The synthetic geophysical signal application validates Spec2Vec on well-defined mock datasets. Before applying the algorithm to noisy, ambiguous real-world data, you can confirm that it correctly isolates physical source signatures using controllable synthetic inputs where the ground truth is known. This gives you confidence that any clustering structure you observe in real catalogs reflects genuine physical differences rather than algorithmic artifacts.
+
+## Supported Signal Types
+
+The synthetic catalog spans several distinct geophysical source classes, each with characteristic time-frequency signatures:
+
+- **T-Phase earthquakes** — hydroacoustic arrivals with narrow-band, long-duration energy
+- **Strombolian explosions** — impulsive, broadband bursts with rapid onset and exponential decay
+- **Surface wave dispersions** — frequency-dependent group velocity arrivals that sweep from high to low frequency over time
+- **Other categorical geophysical waveforms** — additional synthetically defined classes representing a range of source mechanisms and propagation effects
+
+## Pre-Computed Data
+
+<Note>
+The required data files have already been generated and are available in `synth_geophysical_signal_clustering/data/`. You do not need to run any generation scripts before opening the visualization notebook.
+
+- **`synth_geophysical_waveform_catalog.npy`** — A NumPy array containing the raw catalog of synthesized time-series waveforms, organized by signal class.
+- **`spec2vec_synth_geophysical_signals.csv`** — A pre-computed CSV dataset containing the extracted Spec2Vec feature vectors and class labels for every waveform in the catalog.
+</Note>
+
+## Two Usage Paths
+
+Depending on whether you want to inspect results immediately or experiment with new configurations, choose one of the two notebooks below.
+
+<Tabs>
+  <Tab title="Reproduce Results">
+    Open `synth_geophysical_signals_application_figures.ipynb` and run it from top to bottom. The notebook automatically loads the pre-computed feature data from the `data/` folder and generates the clustering visualizations, statistical comparisons, and dimensionality reduction scatter plots that appear in the Spec2Vec publication. No data generation or feature extraction is required.
+
+    **Best for:** Checking that your environment is set up correctly, reproducing paper figures, or presenting results without rerunning expensive computation.
+  </Tab>
+  <Tab title="Generate New Data">
+    Open `synth_geophysical_signals_application.ipynb`. This notebook walks you through the full pipeline from scratch: defining synthetic waveform parameters, generating time-series records with controllable physical properties (amplitude, frequency content, signal-to-noise ratio, dispersion curves), converting each record to a Time-Frequency Representation, and computing the complete Spec2Vec feature suite on the resulting spectrograms.
+
+    **Best for:** Experimenting with new signal classes, tuning synthesis parameters, exploring how feature sensitivity changes with noise level, or generating training data for downstream models.
+  </Tab>
+</Tabs>
+
+## What the Notebooks Cover
+
+Both notebooks together demonstrate the complete synthetic signal analysis workflow:
+
+- **Preparing and generating synthetic waveforms** — constructing mock geophysical records with physically motivated parameters such as center frequency, dispersion gradient, source duration, and noise coloration
+- **Transforming time series into TFRs** — converting each 1D waveform into a 2D Time-Frequency Representation using STFT or CWT, making the signal's spectral evolution visible and extractable
+- **Computing the Spec2Vec feature suite** — running the `GISQAPipeline` to extract the full set of entropy, complexity, and spatial metrics from each TFR
+- **Clustering and visualization** — producing dimensionality-reduction scatter plots (e.g., PCA, UMAP), cluster assignment maps, and per-class statistical comparisons that match the figures presented in the publication
+
+<Note>
+Update the local file path variables inside the notebooks to point to your `synth_geophysical_signal_clustering/` directory before running any cells. The notebooks use these path variables to locate the `data/` folder and to write any newly computed outputs.
+</Note>

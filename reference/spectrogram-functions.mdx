@@ -1,0 +1,229 @@
+---
+title: "Spectrogram Generation Functions: STFT and CWT"
+sidebarTitle: "Spectrograms"
+description: "Reference for stft_basic_spectogram and cwt_simple: convert 1D time-series into 2D time-frequency representations for Spec2Vec feature extraction."
+---
+
+Spec2Vec includes built-in functions to convert 1D time-series signals into 2D time-frequency representations (TFRs). These representations expose the frequency content of your signal as a function of time and are the recommended input format when you want to extract richer spatial and textural features using the Hilbert curve flattening path in `GISQAPipeline`. Both functions live in a single module — import them as shown below.
+
+## Import
+
+```python
+from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram, cwt_simple
+```
+
+---
+
+## stft\_basic\_spectogram
+
+Computes a Short-Time Fourier Transform (STFT) spectrogram using `scipy.signal.spectrogram`. The output is a 2D matrix of shape `(n_freq, n_time)` ready to pass directly into `GISQAPipeline.compute_pointwise_metrics_from_spec()` with `is_hilbertize=1`.
+
+```python
+import numpy as np
+from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram
+
+sr = 100          # sampling rate in Hz
+t = np.linspace(0, 10, sr * 10)
+signal = np.sin(2 * np.pi * 20 * t) * np.exp(-((t - 5) ** 2) / (2 * 0.5 ** 2))
+
+f, t_axis, spec = stft_basic_spectogram(
+    t_seg_data=signal,
+    sr=sr,
+    nperseg=64,
+    overlap=0.75,
+    window='hann',
+    f_min=0.0,
+    f_max=50.0,
+    max_normalize=True,
+    powerlog=True,
+    normalize_range=(1e-8, 1),
+    vmin_percentile=5,
+    vmax_percentile=100
+)
+
+print(spec.shape)  # (n_freq, n_time)
+```
+
+### Parameters
+
+<ParamField path="t_seg_data" type="np.ndarray" required>
+  The 1D input time-series signal to transform.
+</ParamField>
+
+<ParamField path="sr" type="int or float" required>
+  Sampling rate of the signal in Hz.
+</ParamField>
+
+<ParamField path="nperseg" type="int" required>
+  Number of samples per STFT segment. Controls the trade-off between time and frequency resolution: larger values give finer frequency resolution but coarser time resolution. Common choices for 100 Hz signals are `32`, `64`, or `128`.
+</ParamField>
+
+<ParamField path="overlap" type="float" required>
+  Fractional overlap between consecutive STFT segments (e.g., `0.5` for 50% overlap, `0.75` for 75%). Higher overlap produces smoother time resolution at the cost of increased output size.
+</ParamField>
+
+<ParamField path="window" type="str or tuple" required>
+  Window function to apply to each segment. Any window accepted by `scipy.signal.get_window()` is valid, such as `'hann'`, `'hamming'`, or `'blackman'`.
+</ParamField>
+
+<ParamField path="f_min" type="float" required>
+  Minimum frequency (Hz) to retain in the output spectrogram. Frequency bins below this value are discarded.
+</ParamField>
+
+<ParamField path="f_max" type="float" required>
+  Maximum frequency (Hz) to retain in the output spectrogram. Frequency bins above this value are discarded. Should not exceed the Nyquist frequency (`sr / 2`).
+</ParamField>
+
+<ParamField path="max_normalize" type="bool" default="True">
+  When `True`, applies `MinMaxScaler` to rescale all spectrogram values into `normalize_range` before the log transform step. Disable this if you want to preserve the original magnitude scale.
+</ParamField>
+
+<ParamField path="powerlog" type="bool" default="True">
+  When `True`, converts the magnitude spectrogram to a decibel scale using `10 * log10(values)`. This compresses the dynamic range and is recommended for most geophysical signals.
+</ParamField>
+
+<ParamField path="normalize_range" type="tuple" default="(1e-8, 1)">
+  The `(min, max)` range used by `MinMaxScaler` during normalization. The non-zero lower bound prevents `log10(0)` errors when `powerlog=True`.
+</ParamField>
+
+<ParamField path="vmin_percentile" type="int" default="5">
+  Lower percentile for clipping the spectrogram. Values below this percentile are set to the percentile value, suppressing low-energy background noise.
+</ParamField>
+
+<ParamField path="vmax_percentile" type="int" default="100">
+  Upper percentile for clipping the spectrogram. Values above this percentile are capped, reducing the influence of transient amplitude spikes.
+</ParamField>
+
+### Returns
+
+<ResponseField name="f" type="np.ndarray">
+  1D frequency array in Hz, shaped `(n_freq,)`. Frequencies are returned in **ascending** order.
+</ResponseField>
+
+<ResponseField name="t" type="np.ndarray">
+  1D time array in seconds, shaped `(n_time,)`.
+</ResponseField>
+
+<ResponseField name="spectro" type="np.ndarray">
+  2D spectrogram matrix of shape `(n_freq, n_time)`. Pass this directly as an element of `spec_images` in `compute_pointwise_metrics_from_spec()`.
+</ResponseField>
+
+---
+
+## cwt\_simple
+
+Computes a Continuous Wavelet Transform (CWT) scalogram using `pywt.cwt`. Unlike the STFT, the CWT uses frequency-adaptive window sizes: short windows for high-frequency components and long windows for low-frequency components. This multi-resolution property makes it well-suited for non-stationary signals with transient features. The function returns the real-valued magnitude of the complex wavelet coefficients.
+
+```python
+import numpy as np
+from SPEC2VEC.utils.spectograms_lib import cwt_simple
+
+sr = 1000
+t = np.linspace(0, 2, sr * 2)
+signal = np.sin(2 * np.pi * 50 * t) + 0.5 * np.random.randn(len(t))
+
+f, t_axis, scalogram, _ = cwt_simple(
+    signal=signal,
+    sr=sr,
+    dt=None,
+    fscale={'start': 1, 'end': 256, 'num': 10},
+    wavelet='cmor1.5-1.0',
+    vmin_percentile=2,
+    vmax_percentile=98,
+    f_min=0,
+    f_max=200,
+    max_normalize=True,
+    fscaletype='linear',
+    powerlog=False,
+    normalize_range=(1e-8, 1),
+    decimate_factor=None
+)
+
+print(scalogram.shape)  # (n_scales, n_time)
+```
+
+### Parameters
+
+<ParamField path="signal" type="np.ndarray" required>
+  1D input time-series signal. Must be one-dimensional — the function will raise an `AssertionError` if a 2D array is passed.
+</ParamField>
+
+<ParamField path="sr" type="int" default="1000">
+  Sampling rate in Hz. Used to compute the time vector and sampling period when `dt` is `None`.
+</ParamField>
+
+<ParamField path="dt" type="float or None" default="None">
+  Sampling period in seconds. When `None`, it is computed automatically from `sr`. Provide an explicit value if your signal has an irregular or non-standard sampling period.
+</ParamField>
+
+<ParamField path="fscale" type="dict" default="{'start': 1, 'end': 512, 'num': 100}">
+  Dictionary specifying the scale (frequency) range to compute. The `'start'` and `'end'` keys define the minimum and maximum scale values; `'num'` defines the step size (for `'linear'` mode) or number of points (for `'log'` mode). Adjust `'end'` to match the Nyquist frequency of your signal.
+</ParamField>
+
+<ParamField path="wavelet" type="str" default="'cmor1.5-1.0'">
+  Name of the continuous wavelet in PyWavelets syntax. The complex Morlet wavelet `'cmor1.5-1.0'` is the default and is well-suited for oscillatory geophysical signals. Other valid choices include `'mexh'` (Mexican hat) or `'morl'` (Morlet).
+</ParamField>
+
+<ParamField path="vmin_percentile" type="int" default="2">
+  Lower percentile for clipping the output scalogram. Values below this percentile are set to the percentile value.
+</ParamField>
+
+<ParamField path="vmax_percentile" type="int" default="98">
+  Upper percentile for clipping the output scalogram.
+</ParamField>
+
+<ParamField path="f_min" type="int" default="0">
+  Minimum frequency (Hz) to retain in the output. Rows corresponding to lower frequencies are removed.
+</ParamField>
+
+<ParamField path="f_max" type="int or None" default="None">
+  Maximum frequency (Hz) to retain. When `None`, all frequencies up to the maximum scale are kept.
+</ParamField>
+
+<ParamField path="max_normalize" type="bool" default="True">
+  When `True`, applies `MinMaxScaler` to rescale values into `normalize_range`.
+</ParamField>
+
+<ParamField path="fscaletype" type="str" default="'linear'">
+  Frequency scale spacing. Use `'linear'` for uniform spacing across the frequency axis or `'log'` for logarithmically spaced scales (useful when you want equal resolution per octave, as in musical or seismic analysis).
+</ParamField>
+
+<ParamField path="powerlog" type="bool" default="False">
+  When `True`, applies `10 * log10` to the magnitude scalogram. Defaults to `False` for CWT because log scaling is less common in wavelet-based analysis.
+</ParamField>
+
+<ParamField path="normalize_range" type="tuple" default="(1e-8, 1)">
+  The `(min, max)` range for `MinMaxScaler` normalization.
+</ParamField>
+
+<ParamField path="decimate_factor" type="int or None" default="None">
+  When set, reduces the time axis of the scalogram by keeping every `decimate_factor`-th column. Useful for very long signals where the CWT output would otherwise be too large to process efficiently.
+</ParamField>
+
+### Returns
+
+<ResponseField name="f" type="np.ndarray">
+  1D frequency array in Hz, shaped `(n_scales,)`, in ascending order.
+</ResponseField>
+
+<ResponseField name="t" type="np.ndarray">
+  1D time array in seconds, shaped `(n_time,)`.
+</ResponseField>
+
+<ResponseField name="scalogram" type="np.ndarray">
+  2D real-valued magnitude scalogram of shape `(n_scales, n_time)`. This is the array you pass into `GISQAPipeline`.
+</ResponseField>
+
+<ResponseField name="cwtmatr_cmplx" type="np.ndarray">
+  Raw complex CWT coefficient matrix before magnitude extraction. Useful if you need phase information for custom downstream processing.
+</ResponseField>
+
+---
+
+## Choosing Between STFT and CWT
+
+<Tip>
+  **Use `stft_basic_spectogram`** when your signal is approximately stationary, you need fast processing of large batches, or you want fixed time–frequency resolution across the entire signal. STFT is significantly faster than CWT and produces rectangular spectrogram tiles that are easy to compare across signals.
+
+  **Use `cwt_simple`** when your signal contains transient or non-stationary features — for example, earthquake P-wave arrivals, DAS glitches, or short-duration acoustic pulses — where capturing the instantaneous frequency content at multiple time scales is important. CWT provides higher time resolution at high frequencies and higher frequency resolution at low frequencies, at the cost of longer compute time.
+</Tip>

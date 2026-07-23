@@ -1,0 +1,124 @@
+---
+title: "What Are Spectral Fingerprints in Spec2Vec?"
+sidebarTitle: "Spectral Fingerprints"
+description: "Learn how Spec2Vec creates a unique spectral fingerprint for each signal using information-theoretic, statistical, and spatial metrics across time-frequency representations."
+---
+
+Just as a fingerprint uniquely identifies a person from the arrangement of ridges and whorls in their skin, a spectral fingerprint uniquely identifies a signal from the arrangement of energy across time and frequency. Spec2Vec constructs this identity numerically: it extracts over 50 named scalar metrics from a signal's time-frequency representation and concatenates them into a single fixed-length vector. Two signals with similar physical character — the same source mechanism, propagation path, or noise environment — will land close together in that vector space, while signals of different character will be far apart.
+
+## From signal to spectrogram
+
+Before any metrics are computed, a 1D time-series must be mapped into a 2D time-frequency representation (TFR). Spec2Vec supports two transforms out of the box, both available in `utils/spectograms_lib.py`:
+
+<CardGroup cols={2}>
+  <Card title="STFT spectrogram" icon="chart-bar">
+    `stft_basic_spectogram()` uses SciPy's Short-Time Fourier Transform to produce a magnitude or decibel-scale spectrogram. Key parameters include the window length (`nperseg`), fractional overlap, window function, and frequency bounds `[f_min, f_max]`. This is the recommended starting point for most geophysical waveforms.
+  </Card>
+  <Card title="CWT scalogram" icon="wave-square">
+    `cwt_simple()` uses PyWavelets to compute a Continuous Wavelet Transform scalogram. It supports arbitrary mother wavelets (e.g., `cmor1.5-1.0`) and both linear and logarithmic frequency scales. CWT captures transient features at multiple resolutions and is preferred for non-stationary signals.
+  </Card>
+</CardGroup>
+
+Both functions return a frequency array `f`, a time array `t`, and the 2D spectrogram matrix `spectro`. The matrix is the input to the fingerprinting pipeline.
+
+<Tip>
+  You do not have to use these built-in spectrogram functions. Any 2D NumPy array — a mel-spectrogram, a wavelet packet transform matrix, or a short-time power spectrum — can be passed directly to the pipeline as long as it has a consistent shape across your dataset.
+</Tip>
+
+## Hilbert curve flattening
+
+Feature extractors from the `antropy`, `ordpy`, and `tsfel` libraries all operate on 1D arrays. A naïve row-by-row or column-by-column flattening of a 2D spectrogram destroys spatial relationships: pixels that are adjacent in frequency are no longer adjacent in the 1D array when a new row begins.
+
+Spec2Vec solves this with a **Hilbert space-filling curve** (or its generalised variant, the Gilbertised curve, for non-square images). A space-filling curve visits every pixel in the 2D grid exactly once while maximising the probability that pixels that are spatially close in 2D remain close in the resulting 1D trace.
+
+<Steps>
+  <Step title="Determine image geometry">
+    If the spectrogram is square with power-of-2 dimensions, the standard Hilbert curve is used (`_hilbertize_sym_data`). For rectangular spectrograms — the common case with STFT — the generalised Gilbertised algorithm (`_ghilbertize_asym_data`) is applied instead.
+  </Step>
+  <Step title="Build the curve index">
+    A lookup array `locs` of shape `(N_pixels, 2)` is generated, mapping each position along the 1D trace to its `(row, col)` coordinate in the 2D spectrogram.
+  </Step>
+  <Step title="Sample the spectrogram">
+    The spectrogram is indexed as `spec[locs[:,0], locs[:,1]]` to produce a 1D array of length `N_pixels = height × width`. This trace is then fed to all metric extractors.
+  </Step>
+</Steps>
+
+Enable Hilbert curve flattening by setting `is_hilbertize=1` when calling `compute_pointwise_metrics_from_spec()`. For raw 1D time-series inputs, set `is_hilbertize=0` — the signal is used directly without a flattening step.
+
+<Note>
+  If you are processing a large batch of spectrograms that all have the same shape, you can pre-compute the Hilbert locations once using `HelperFunc.gilbertize_image_optimized()` and pass the result as `hilbert_locs` to skip recomputation on every call.
+</Note>
+
+## Metric categories
+
+Once the spectrogram has been flattened to a 1D trace, three families of metrics are computed in parallel.
+
+<CardGroup cols={3}>
+  <Card title="Information-theoretic & entropy" icon="circle-info">
+    These metrics quantify **disorder, predictability, and structural complexity** in the signal. A white-noise spectrogram will have near-maximum permutation entropy; a narrowband monochromatic tone will have very low entropy. This family includes measures from both `antropy` (e.g., permutation entropy, SVD entropy, approximate entropy, sample entropy, Hjorth mobility/complexity) and `ordpy` (e.g., Fisher–Shannon information, Rényi complexity-entropy, Tsallis complexity-entropy, weighted permutation entropy, missing ordinal patterns).
+  </Card>
+  <Card title="Complexity & fractal dimension" icon="chart-scatter">
+    These metrics quantify **self-similarity and roughness** of the signal trace. Higher fractal dimension indicates a rougher, more complex waveform. This family includes Petrosian FD, Katz FD, Higuchi FD, detrended fluctuation analysis (DFA), and Lempel-Ziv complexity — all computed via `antropy` and `tsfel`.
+  </Card>
+  <Card title="Statistical moments & distribution" icon="sigma">
+    These metrics capture the **amplitude distribution** of spectrogram pixel values: mean, variance, skewness, kurtosis, root mean square, interquartile range, ECDF percentiles, histogram mode, and more. They are computed via `tsfel` and describe the overall energy budget and shape of the amplitude distribution.
+  </Card>
+</CardGroup>
+
+### Entropy & ordpy features in detail
+
+| Feature | Library | What it measures |
+|---|---|---|
+| `permutation_entropy_antropy` | antropy | Randomness of ordinal patterns in the trace |
+| `spectral_entropy_antropy` | antropy | Flatness of the power spectral density |
+| `svd_entropy_antropy` | antropy | Complexity of the trajectory matrix via SVD |
+| `approximate_entropy_antropy` | antropy | Regularity and unpredictability of fluctuations |
+| `sample_entropy_antropy` | antropy | Regularity, less biased than approximate entropy |
+| `hjorth_mobility_antropy` | antropy | Mean frequency estimate of the signal |
+| `hjorth_complexity_antropy` | antropy | Deviation of shape from a pure sine wave |
+| `num_zerocross_antropy` | antropy | Rate of zero-crossings (loosely tracks dominant frequency) |
+| `normalized_permutation_entropy_ordpy` | ordpy | Permutation entropy normalised to [0,1] |
+| `statistical_complexity_entropy_ordpy` | ordpy | Jensen–Shannon divergence from uniform distribution |
+| `fisher_shannon_ordpy` | ordpy | Fisher information weighted by ordinal pattern probabilities |
+| `global_node_entropy_ordpy` | ordpy | Entropy of the ordinal network node degree distribution |
+| `missing_links_ordpy` | ordpy | Fraction of absent transitions in the ordinal network |
+| `missing_patterns_ordpy` | ordpy | Fraction of unobserved ordinal patterns |
+| `renyi_complexity_entropy_*_ordpy` | ordpy | Rényi entropy at α = 0.5, 1.5, and 3.0 |
+| `tsallis_complexity_entropy_*_ordpy` | ordpy | Tsallis entropy at q = 0.5 and 1.5 |
+| `weighted_permutation_entropy_ordpy` | ordpy | Permutation entropy weighted by amplitude variance |
+
+### Fractal & complexity features in detail
+
+| Feature | Library | What it measures |
+|---|---|---|
+| `petrosian_fd_antropy` | antropy | Rapid estimate of fractal dimension from zero-crossing rate |
+| `katz_fd_antropy` | antropy | Fractal dimension from maximum waveform extent vs. mean step |
+| `higuchi_fd_antropy` | antropy | Precise fractal dimension via finite differences at multiple scales |
+| `detrended_fluctuation_antropy` | antropy | Long-range power-law correlations (DFA exponent) |
+| `Lempel-Ziv complexity` | tsfel | Normalised complexity based on substring pattern count |
+
+## Best features
+
+When you set `is_best_features=1`, Spec2Vec returns only the five metrics that have been empirically identified as the most discriminating across geophysical signal datasets:
+
+```
+detrended_fluctuation_antropy
+fisher_shannon_ordpy
+Lempel-Ziv complexity
+svd_entropy_antropy
+approximate_entropy_antropy
+```
+
+This preset is ideal for fast exploratory clustering where you want a compact embedding without computing all 50+ features. For production pipelines or when interpretability of every dimension matters, set `is_best_features=0` and optionally pass a `metrics_list` to select exactly the features you need.
+
+## The resulting vector
+
+After all three metric families are computed, the results from `antropy`, `ordpy`, and `tsfel` are horizontally concatenated into a single-row pandas DataFrame. That row is your signal's **spectral fingerprint** — a fixed-length numerical identity that can be used directly as input to:
+
+- **Clustering** — k-means, HDBSCAN, Gaussian Mixture Models
+- **Dimensionality reduction** — UMAP, PCA, t-SNE for visualisation
+- **Classification** — any scikit-learn classifier (Random Forest, SVM, etc.)
+- **Anomaly detection** — distance-based outlier scores in feature space
+- **Feature importance analysis** — SHAP values to identify which metrics drive cluster separation
+
+Because every dimension has a name and a definition, SHAP plots over Spec2Vec embeddings are immediately interpretable: a SHAP value on `detrended_fluctuation_antropy` tells you directly how much the long-range correlation structure of the waveform influenced a particular classification decision.

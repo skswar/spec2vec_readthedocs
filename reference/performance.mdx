@@ -1,0 +1,201 @@
+---
+title: "Spec2Vec Performance and Time Complexity"
+sidebarTitle: "Performance"
+description: "Understand Spec2Vec's runtime scaling with spectrogram resolution. Benchmark data for 128×128, 256×256, and 512×512 inputs, plus optimization tips."
+---
+
+Spec2Vec's computation time scales with spectrogram image resolution. Understanding this scaling helps you choose the right resolution for your application and set realistic expectations for large-batch processing jobs. The two main metric families — pointwise (statistical, entropy, fractal) and pairwise (spatial zone) — have different scaling behaviors and can be tuned independently.
+
+---
+
+## Benchmarks
+
+The `time_complexity_analysis/` directory contains a benchmarking script and pre-computed noise reference banks at three standard resolutions. The table below shows wall-clock times measured on a consistent hardware setup for batches of 50, 100, 500, and 1000 spectrograms at each resolution.
+
+### Timing Results
+
+| Resolution | N signals | Pointwise time (s) | Pairwise time (s) | Total time (s) |
+|---|---|---|---|---|
+| 128 × 128 | 50 | 28.3 | 24.4 | 52.7 |
+| 128 × 128 | 100 | 56.5 | 54.1 | 110.6 |
+| 128 × 128 | 500 | 282.0 | 257.8 | 539.8 |
+| 128 × 128 | 1000 | 564.6 | 504.3 | 1068.9 |
+| 256 × 256 | 50 | 99.5 | 48.7 | 148.1 |
+| 256 × 256 | 100 | 201.2 | 97.3 | 298.6 |
+| 256 × 256 | 500 | 998.7 | 486.9 | 1485.6 |
+| 256 × 256 | 1000 | 2003.6 | 962.4 | 2966.0 |
+| 512 × 512 | 50 | 406.9 | 131.6 | 538.5 |
+| 512 × 512 | 100 | 810.7 | 253.9 | 1064.6 |
+| 512 × 512 | 500 | 4057.2 | 1270.6 | 5327.8 |
+| 512 × 512 | 1000 | 8117.8 | 2527.2 | 10645.0 |
+
+Raw results are stored in `time_complexity_analysis/codes_and_files/time_complexity_results_diff_dims.csv`. A visualization of the scaling curves is saved as `total_time_complexity_plot_diff_dims.png` in the same directory.
+
+**Key observations:**
+
+- **Pointwise metrics dominate at higher resolutions.** At 512 × 512, pointwise time is approximately 3× the pairwise time, because entropy and fractal dimension calculations scale with the length of the Hilbert-flattened 1D sequence.
+- **Pairwise time grows more slowly with resolution** because the histogram alignment and GMM steps operate on a fixed number of bins (`hist_bins`), not on every pixel directly.
+- **Scaling is approximately linear with the number of signals** across all resolutions, confirming that the pipeline is embarrassingly parallelizable.
+
+<Note>
+  These benchmarks were measured on a single CPU core. If you parallelize across cores using Python's `multiprocessing` or `joblib`, you can expect near-linear speedup up to the number of physical cores available on your machine.
+</Note>
+
+---
+
+## Optimization Strategies
+
+<Accordion title="Use metrics_list to select specific features">
+  Computing the full feature suite (50+ metrics) is often unnecessary, especially during prototyping. Pass a `metrics_list` to `compute_pointwise_metrics_from_spec()` to compute only the features you need.
+
+  ```python
+  fast_metrics = [
+      'permutation_entropy_antropy',
+      'svd_entropy_antropy',
+      'detrended_fluctuation_antropy',
+      'spectral_entropy_antropy'
+  ]
+
+  df = giq.compute_pointwise_metrics_from_spec(
+      spec_names=signal_names,
+      spec_images=signal_arrays,
+      is_hilbertize=1,
+      is_normalize_stat=0,
+      is_normalize_entropy=0,
+      is_best_features=0,
+      metrics_list=fast_metrics
+  )
+  ```
+
+  Computing 4 features instead of 50+ can reduce pointwise runtime by 10–15×, depending on which features you select. Entropy metrics are generally faster than fractal dimension metrics.
+</Accordion>
+
+<Accordion title="Pre-compute Hilbert curve locations">
+  When you process many signals at the same spectrogram resolution, the Hilbert (Gilbert) curve index computation is repeated identically on every call. Pre-compute it once and pass the result via the `hilbert_locs` keyword argument.
+
+  ```python
+  from SPEC2VEC.utils.gisqa_helper import HelperFunc
+
+  H, W = 128, 128  # your spectrogram dimensions
+  hilbert_locs = HelperFunc.gilbertize_image(width=H, height=W)
+
+  df = giq.compute_pointwise_metrics_from_spec(
+      spec_names=signal_names,
+      spec_images=signal_arrays,
+      is_hilbertize=1,
+      is_normalize_stat=0,
+      is_normalize_entropy=0,
+      is_best_features=0,
+      metrics_list=None,
+      hilbert_locs=hilbert_locs   # reused on every iteration
+  )
+  ```
+
+  For a batch of 1000 signals this eliminates 1000 redundant curve-generation calls. The benefit scales linearly with batch size.
+</Accordion>
+
+<Accordion title="Use is_best_features=1 for maximum speed">
+  Setting `is_best_features=1` restricts output to the five features with the highest empirical discriminating power across geophysical signal categories:
+
+  - `detrended_fluctuation_antropy`
+  - `fisher_shannon_ordpy`
+  - `0_Lempel-Ziv complexity`
+  - `svd_entropy_antropy`
+  - `approximate_entropy_antropy`
+
+  ```python
+  df = giq.compute_pointwise_metrics_from_spec(
+      spec_names=signal_names,
+      spec_images=signal_arrays,
+      is_hilbertize=1,
+      is_normalize_stat=1,
+      is_normalize_entropy=0,
+      is_best_features=1   # only the top 5 features
+  )
+  ```
+
+  This is the recommended setting for quick screening of large catalogs before committing to a full-feature extraction run.
+</Accordion>
+
+<Accordion title="Reduce spectrogram resolution">
+  Smaller spectrogram images process substantially faster. At 128 × 128, a batch of 1000 signals takes roughly 1069 seconds total; the same batch at 512 × 512 takes over 10 600 seconds — a 10× difference.
+
+  Choose the smallest resolution that preserves the key frequency content of your signals. For most seismic applications at 100 Hz, a 64 × 64 or 128 × 128 spectrogram captures all diagnostically relevant features. Use the `interp_size` parameter in `compute_imgbank_dict()` to standardize images to a target resolution if your raw STFT output is larger.
+
+  ```python
+  f, t, spec = stft_basic_spectogram(
+      signal, sr=100, nperseg=32,    # smaller window → fewer frequency bins
+      overlap=0.5, window='hann',
+      f_min=0, f_max=50
+  )
+  # spec.shape is approximately (16, 200) — small and fast to process
+  ```
+</Accordion>
+
+<Accordion title="Batch processing">
+  Always pass your entire signal collection to a single `compute_pointwise_metrics_from_spec()` call rather than looping over signals and calling the method once per signal. The batch path amortizes Python function-call overhead and enables consistent progress reporting every 50 signals.
+
+  ```python
+  # Preferred: one batch call
+  df = giq.compute_pointwise_metrics_from_spec(
+      spec_names=all_names,      # list of N names
+      spec_images=all_spectros,  # list of N arrays
+      is_hilbertize=1,
+      is_best_features=0,
+      metrics_list=fast_metrics
+  )
+
+  # Avoid: calling once per signal in a loop
+  # for name, spec in zip(all_names, all_spectros):
+  #     df = giq.compute_pointwise_metrics_from_spec([name], [spec], ...)
+  ```
+</Accordion>
+
+---
+
+## Running the Benchmark Yourself
+
+To reproduce the timing table above or measure performance on your own hardware, run the benchmarking script from the root of the repository:
+
+```bash
+python SPEC2VEC/time_complexity_analysis/codes_and_files/analyze_time.py
+```
+
+The script processes mock signals against the pre-computed noise reference banks stored in `time_complexity_analysis/data_noise_ref/`:
+
+| File | Resolution |
+|---|---|
+| `tc_noise_reference_128by128.h5` | 128 × 128 |
+| `tc_noise_reference_256by256.h5` | 256 × 256 |
+| `tc_noise_reference_512by512.h5` | 512 × 512 |
+
+These pre-built banks are provided so that noise-generation overhead does not skew the timing results for the metric extraction steps themselves. Results are written to `codes_and_files/time_complexity_results_diff_dims.csv` and a summary plot is saved as `total_time_complexity_plot_diff_dims.png`.
+
+<Note>
+  Make sure your Python environment is fully set up with all required dependencies and that you run the script from the **root of the repository** so that relative imports (`SPEC2VEC.utils.*`) resolve correctly.
+</Note>
+
+---
+
+## Numba JIT Compilation
+
+<Note>
+  Spec2Vec uses [Numba](https://numba.readthedocs.io/) for JIT (Just-In-Time) compilation of performance-critical inner loops, including the `à trous` circular convolution used in the Maximal Overlap Wavelet Packet Transform (MOWPT). The **first call** to any Numba-compiled function in a Python session will be noticeably slower than subsequent calls, because Numba compiles the function to native machine code at that point. This one-time compilation cost typically takes a few seconds. All subsequent calls in the same session run at full native speed.
+
+  If you are benchmarking Spec2Vec, make one "warm-up" call before starting your timer to avoid measuring the compilation overhead:
+
+  ```python
+  import numpy as np
+  from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+
+  giq = GISQAPipeline()
+  dummy = np.random.randn(128, 128)
+
+  # Warm-up call — triggers Numba compilation
+  _ = giq.compute_pointwise_metrics_from_spec(
+      ['warmup'], [dummy], is_hilbertize=1, is_best_features=1
+  )
+
+  # Your timed benchmark starts here
+  ```
+</Note>

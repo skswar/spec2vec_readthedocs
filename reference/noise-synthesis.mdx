@@ -1,0 +1,200 @@
+---
+title: "Noise Generation and Synthetic Signal Utilities"
+sidebarTitle: "Noise Synthesis"
+description: "Reference for Spec2Vec's noise generation tools: colored noise (white, red, pink), synthetic signal formulation, and noise bank construction for pairwise metrics."
+---
+
+Spec2Vec includes a suite of utilities for generating colored noise time-series and simple synthetic signals. These tools serve two primary purposes: building noise reference banks for pairwise metric extraction, and generating labeled synthetic datasets for prototyping and benchmarking your analysis pipeline. The core generators live in `noise_lib.py`, while higher-level signal models are in `simple_synth_data_models.py`.
+
+## Import
+
+```python
+from SPEC2VEC.utils.noise_lib import ColoredNoiseGenerator, white_noise_series
+from SPEC2VEC.utils.simple_synth_data_models import (
+    gen_additive_synthetic_signal,
+    gen_multiplicative_synthetic_signal,
+)
+```
+
+---
+
+## Colored Noise Types
+
+Spec2Vec generates colored noise by shaping white Gaussian noise in the frequency domain. The `ColoredNoiseGenerator` class accepts the desired number of samples `N` and exposes one method per noise color.
+
+```python
+from SPEC2VEC.utils.noise_lib import ColoredNoiseGenerator
+
+L = 1000   # number of samples (Fs * duration)
+gen = ColoredNoiseGenerator(N=L)
+
+white  = gen.white()       # flat power spectrum
+pink   = gen.pink()        # power ∝ 1/f
+red    = gen.brownian()    # power ∝ 1/f²
+blue   = gen.blue()        # power ∝ f
+violet = gen.violet()      # power ∝ f²
+f3     = gen.higher_order_noise_3()  # power ∝ 1/f³
+f4     = gen.higher_order_noise_4()  # power ∝ 1/f⁴
+```
+
+The table below summarizes the spectral shape of each noise color and its typical geophysical context.
+
+| Color | PSD shape | Geophysical relevance |
+|---|---|---|
+| **White** | Flat (`1`) | Instrument self-noise, thermal noise |
+| **Pink** | `1/f` | Background seismic hum, infrasound |
+| **Red / Brownian** | `1/f²` | Ocean microseisms, long-period ground motion |
+| **Blue** | `f` | High-frequency anthropogenic noise |
+| **Violet** | `f²` | Strongly high-frequency dominated processes |
+| **f3 / f4** | `1/f³`, `1/f⁴` | Very long-period or deep Earth processes |
+
+<Note>
+  All `ColoredNoiseGenerator` methods return a `numpy` array of length `N`. The output is not amplitude-normalized by default. If you need unit-scale signals for spectrogram generation, normalize with `sklearn.preprocessing.MinMaxScaler(feature_range=(-1, 1))` before computing the STFT or CWT.
+</Note>
+
+---
+
+## Building a Noise Bank
+
+Pairwise metric extraction requires a noise reference bank: a collection of spectrogram images computed from multiple realizations of different noise types. The bank defines the statistical "background" against which your target signal's amplitude distribution is aligned before GMM labeling and GLSZM zone metric computation.
+
+Use `GISQAPipeline.compute_imgbank_dict()` to build a bank programmatically. Pass `spec_types=['stft']` and a list of noise color strings in `noiselist`. The method generates `total_realizations` independent noise realizations per noise color and STFT parameter combination, converts each to a spectrogram, and stores all images in a structured dictionary.
+
+```python
+from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+
+giq = GISQAPipeline()
+
+img_bank = giq.compute_imgbank_dict(
+    spec_types=['stft'],
+    noiselist=['white', 'pink', 'red'],
+    Fs=100,
+    time_in_sec=10,
+    total_realizations=50,
+    f_min=0,
+    f_max=50,
+    save_path='my_noise_bank.h5'
+)
+
+# img_bank keys look like: 'white_stft_w32_olap0.5', 'pink_stft_w64_olap0.75', ...
+print(list(img_bank.keys()))
+```
+
+Each key in the returned dictionary corresponds to one noise type and STFT window configuration. The values are sub-dictionaries with the following fields:
+
+| Field | Shape | Description |
+|---|---|---|
+| `'image'` | `(realizations, 1, H, W)` | Stack of spectrogram images |
+| `'hilbert_image'` | `(realizations, H*W)` | Hilbert-curve-flattened versions of the images |
+| `'time_series'` | `(realizations, L)` | Raw noise time-series used to generate each image |
+| `'f'` | `(H,)` | Frequency axis |
+| `'t'` | `(W,)` | Time axis |
+
+---
+
+## Saving a Noise Bank to HDF5
+
+When you provide `save_path` to `compute_imgbank_dict()`, the bank is automatically written to an HDF5 file. You can then pass that path directly to `execute_pairwise_pipeline()` via the `noisebnk_path` argument, avoiding the need to regenerate the bank on every analysis run.
+
+```python
+import h5py
+
+# Inspect saved bank
+with h5py.File('my_noise_bank.h5', 'r') as f:
+    for key in f.keys():
+        print(key, f[key]['image'].shape)
+
+# Use with the pairwise pipeline
+glszm_df, details = giq.execute_pairwise_pipleine(
+    t_plot=t_arr,
+    f_plot=f_arr,
+    spec_img=my_spectrogram,
+    noisebnk_path='my_noise_bank.h5',
+    noisebnk_keys=list(f.keys()),
+    binary_keys=[],
+    filename='event_001',
+    save_path='./plots/',
+    save_all_plots=False
+)
+```
+
+<Warning>
+  The noise bank must be built at the same spectrogram resolution (height × width) as the target spectrograms you plan to analyze. If you process signals with multiple resolutions, build a separate bank for each resolution or use the `interp_size` parameter in `compute_imgbank_dict()` to standardize all images to a common shape.
+</Warning>
+
+---
+
+## Simple Synthetic Signal Models
+
+`simple_synth_data_models.py` provides functions for constructing controlled synthetic time-series through three mathematically distinct processes. These are useful for generating labeled training sets, validating your pipeline on signals with known properties, and designing sensitivity tests.
+
+### Additive processes
+
+An additive signal is the superposition of multiple sinusoidal components:
+
+```text
+x(t) = A₁·sin(2π·f₁·t) + A₂·sin(2π·f₂·t) + ··· + Aₙ·sin(2π·fₙ·t)
+```
+
+```python
+from SPEC2VEC.utils.simple_synth_data_models import gen_additive_synthetic_signal
+import numpy as np
+
+t, signal = gen_additive_synthetic_signal(
+    fs=100,
+    T=10,
+    w=np.array([5.0, 20.0, 35.0]),   # frequencies in Hz
+    a=np.array([1.0, 0.5, 0.25])     # amplitudes
+)
+```
+
+### Multiplicative processes
+
+A multiplicative signal encodes amplitude modulation between frequency components. Two formulations are available:
+
+- **Type 1**: `x(t) = sin(A) · sin(B) · ··· · sin(N)` — pure product of sinusoids
+- **Type 2**: `x(t) = sin(A) · (1 + ε · sin(B))` — carrier modulated by a low-frequency envelope
+
+```python
+from SPEC2VEC.utils.simple_synth_data_models import gen_multiplicative_synthetic_signal
+import numpy as np
+
+t, signal = gen_multiplicative_synthetic_signal(
+    fs=100,
+    T=10,
+    w=np.array([5.0, 20.0]),
+    a=np.array([1.0, 0.3]),
+    type=2
+)
+```
+
+### Autoregressive processes
+
+Autoregressive (AR) signals are generated from a linear filter driven by white noise, where the denominator polynomial `A(z)` determines the resonant frequencies and decay rates of the system. This is the `ar_driven_noise_series()` function in `noise_lib.py`.
+
+```python
+from SPEC2VEC.utils.noise_lib import ar_driven_noise_series
+
+ts, times, freq_series, freqs, psd = ar_driven_noise_series(
+    T=10,
+    sampling_rate=100,
+    P=1.0,
+    a_k=[1, -2.2137, 2.9403, -2.1697, 0.9606]
+)
+```
+
+The AR coefficients `a_k` must define a stable system (all roots of the characteristic polynomial inside the unit circle). The function also returns the theoretical PSD, which you can compare against the empirical spectrogram as a sanity check.
+
+---
+
+## When to Use Noise Banks
+
+Pairwise metrics require a noise reference bank because they are inherently comparative: instead of describing a signal in isolation, they characterize how a signal's energy distribution differs from known noise backgrounds.
+
+The pipeline works as follows:
+
+1. **Histogram alignment** — the target spectrogram's amplitude histogram is matched to each noise reference template. The best-matching noise type is selected automatically.
+2. **GMM labeling** — the aligned histogram is decomposed into Gaussian components, and each pixel of the spectrogram is assigned an energy zone label (noise, transitional, signal).
+3. **GLSZM metrics** — spatial zone size statistics are computed from the labeled image, capturing how signal energy is distributed across contiguous regions in time–frequency space.
+
+Without a noise bank, steps 1 and 2 cannot be performed and the pairwise spatial features cannot be extracted. For most applications, a bank of 50 realizations per noise color (white, pink, red) at the target resolution is sufficient to produce stable histogram alignment.

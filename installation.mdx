@@ -1,0 +1,89 @@
+---
+title: "Install Spec2Vec and Set Up Your Python Environment"
+sidebarTitle: "Installation"
+description: "Step-by-step guide to installing Spec2Vec's Python dependencies using conda or pip. Includes optional jax/jwave for acoustic modeling."
+---
+
+The recommended approach is to install Spec2Vec inside a dedicated conda virtual environment running Python 3.10. This keeps Spec2Vec's dependencies isolated from your system Python and from other projects, preventing version conflicts with packages like `numpy`, `numba`, or `jax`. The full installation takes around five minutes on a standard internet connection.
+
+<Warning>
+  Always create and activate a fresh virtual environment before running any installation commands. Installing Spec2Vec's dependencies into your system Python or an existing environment can cause version conflicts that are difficult to diagnose and resolve.
+</Warning>
+
+<Steps>
+  <Step title="Clone the repository">
+    Download the Spec2Vec source code to your local machine using Git.
+
+    ```bash
+    git clone https://github.com/URseismology/Spec2Vec.git
+    cd Spec2Vec
+    ```
+  </Step>
+
+  <Step title="Create a conda environment">
+    Create a new conda environment named `spec2vec_env` with Python 3.10 and the core scientific stack. This single command installs `numpy`, `matplotlib`, `pandas`, `scikit-learn`, `scipy`, `seaborn`, and Jupyter tooling together, so conda can resolve their interdependencies correctly.
+
+    ```bash
+    conda create -n spec2vec_env python=3.10 numpy=2.2 matplotlib pandas \
+        scikit-learn scipy seaborn notebook jupyterlab
+    ```
+  </Step>
+
+  <Step title="Activate the environment">
+    Switch into your new environment before installing any additional packages.
+
+    ```bash
+    conda activate spec2vec_env
+    ```
+  </Step>
+
+  <Step title="Install additional dependencies">
+    Install the remaining Spec2Vec dependencies via pip. These packages cover HDF5 I/O, wavelet transforms, JIT compilation, time-series feature extraction, entropy and complexity measures, spatial indexing, and network analysis.
+
+    ```bash
+    pip install h5py PyWavelets numba tsfel antropy ordpy pyradiomics \
+        numpy-hilbert-curve gstools structify-net networkx
+    ```
+  </Step>
+
+  <Step title="Optional: Acoustic modeling dependencies">
+    If you plan to run the acoustic signal modeling notebooks, install the `jwave` simulation library and its `jax` backend. These packages are GPU-accelerated and are only needed for the `acoustic_signal_modeling/` application folder.
+
+    ```bash
+    pip install jwave jax jaxlib
+    ```
+
+    <Note>
+      You can skip this step entirely if you are not using the acoustic modeling application. All other Spec2Vec features — pointwise metrics, pairwise metrics, spectrogram generation, and the clustering applications — work without `jwave` or `jax`.
+    </Note>
+  </Step>
+</Steps>
+
+## Alternative: Install from Requirements File
+
+If you prefer a single command over the step-by-step approach above, you can install all hard dependencies at once using the pinned requirements file included in the repository.
+
+<CodeGroup>
+  ```bash conda + pip
+  conda create -n spec2vec_env python=3.10
+  conda activate spec2vec_env
+  pip install -r software_requirements/spec2vec_requirements_hard.txt
+  ```
+</CodeGroup>
+
+The `spec2vec_requirements_hard.txt` file contains pinned versions for every dependency, which guarantees a reproducible environment identical to the one used during development.
+
+## Verify Your Installation
+
+Once the environment is active and dependencies are installed, confirm that the core pipeline class imports correctly.
+
+```python
+from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+print("Spec2Vec ready")
+```
+
+If you see `Spec2Vec ready` printed without errors, your environment is set up correctly and you are ready to start extracting spectral features.
+
+<Note>
+  Always launch Jupyter or run Python scripts from the repository root directory (the `Spec2Vec/` folder you cloned). Spec2Vec uses package-relative imports such as `from SPEC2VEC.utils...`, and these resolve only when the repository root is present on your Python path. Launching from a subdirectory will produce `ModuleNotFoundError`.
+</Note>

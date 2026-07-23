@@ -1,0 +1,83 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Spec2Vec",
+  "projectDescription": "An interpretable framework for extracting spectral feature embeddings from 1D time-series and time-frequency representations, designed for geophysical signal characterization and clustering.",
+  "theme": "palm",
+  "primaryColor": "#1A6B8A",
+  "lightColor": "#E8F4F8",
+  "darkColor": "#0D3D52",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/spectral-fingerprints",
+              "concepts/pipeline",
+              "concepts/feature-catalog"
+            ]
+          },
+          {
+            "group": "Applications",
+            "pages": [
+              "applications/das",
+              "applications/esec-clustering",
+              "applications/synthetic-signals",
+              "applications/acoustic-modeling"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/api",
+              "reference/spectrogram-functions",
+              "reference/noise-synthesis",
+              "reference/performance"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/citation",
+              "resources/faq"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Pointwise spectral feature extraction from 1D time series and 2D spectrograms via GISQAPipeline",
+    "Pairwise metrics using noise bank comparison, GMM labeling, and GLSZM spatial features",
+    "STFT and CWT spectrogram generation with configurable frequency ranges and normalization",
+    "50+ information-theoretic, entropy, complexity, and statistical features",
+    "Hilbert curve encoding for spatial flattening of 2D time-frequency representations",
+    "Applications for DAS arrays, seismic event catalog clustering, and synthetic waveform analysis",
+    "Physics-based acoustic wave propagation simulation through heterogeneous media",
+    "SHAP-based feature importance and interpretability tools"
+  ],
+  "publicApiSurface": [
+    "GISQAPipeline.compute_pointwise_metrics_from_spec()",
+    "GISQAPipeline.execute_pairwise_pipeline()",
+    "GISQAPipeline.execute_pointwise_integration()",
+    "GISQAPipeline.compute_imgbank_dict()",
+    "GISQAPipeline.compute_noisebnk_metrics()",
+    "stft_basic_spectogram()",
+    "cwt_simple()",
+    "Simulator.run_basic_setup()",
+    "Simulator.compiled_simulator_sensors()",
+    "Simulator.compiled_simulator_sources()",
+    "Simulator.run_simulation()"
+  ]
+}

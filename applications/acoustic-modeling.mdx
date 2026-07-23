@@ -1,0 +1,162 @@
+---
+title: "Acoustic Wave Propagation Modeling with Spec2Vec"
+sidebarTitle: "Acoustic Modeling"
+description: "Build heterogeneous physical media, simulate acoustic wave propagation with the Simulator class, and analyze resulting waveforms using Spec2Vec features."
+---
+
+The acoustic signal modeling module is a virtual computational laboratory for fluid mechanics. It lets you synthetically construct complex heterogeneous media using graph adjacency matrices or geostatistical spatial covariance models, simulate acoustic wave propagation through them, record signals at virtual sensors positioned anywhere around the domain, and then apply Spec2Vec to the resulting waveforms. The workflow bridges physics-based forward modeling with interpretable signal characterization, making it useful for controlled experiments on how elastic wave propagation interacts with structural complexity.
+
+## When to Use This Module
+
+This module is well suited for three broad use cases:
+
+- **Investigating elastic wave behavior** — systematically vary medium properties (discontinuity density, spatial correlation length, graph topology) and measure how those changes manifest in Spec2Vec feature space
+- **Generating physics-informed synthetic training data** — produce large batches of labeled waveforms with known medium properties to pre-train or benchmark downstream classifiers
+- **Inverse modeling studies** — compare observed sensor waveforms against a library of simulations to infer subsurface structure from surface recordings
+
+## Prerequisites
+
+<Note>
+This module requires the optional `jwave`, `jax`, and `jaxlib` dependencies that are not installed as part of the core Spec2Vec environment. Install them before proceeding:
+
+```bash
+pip install jwave jax jaxlib
+```
+
+Refer to the Installation guide for hardware-specific JAX installation instructions, particularly if you plan to run simulations on GPU.
+</Note>
+
+## Core Workflow
+
+<Steps>
+  <Step title="Define a domain">
+    Create a `Domain` object that specifies the grid dimensions and spatial resolution of your simulation. The domain controls how much physical space the simulation covers and at what granularity the wavefield is computed.
+
+    ```python
+    from jwave.geometry import Domain
+
+    domain = Domain((266, 266), (1, 1))
+    ```
+
+    The first tuple sets the grid size in pixels `(width, height)`. The second tuple sets the spatial resolution `(dx, dy)` in meters per pixel.
+  </Step>
+
+  <Step title="Initialize the Simulator">
+    Instantiate the `Simulator` class with your domain and set the medium construction parameters. The `base_density` and `defect_density` arguments define the wave speed through intact and damaged material, respectively. The `pml_size` controls the thickness of the absorbing boundary layer that prevents wraparound reflections, and `num_air_grid` adds an air layer outside the medium to allow coda wave capture.
+
+    ```python
+    from SPEC2VEC.utils.complex_waveform_models import Simulator
+
+    simulator = Simulator(domain, pml_size=10, num_air_grid=20,
+                          base_density=3000, defect_density=1000)
+    simulator.graph_type = 'perlin_noise'
+    simulator.p_vals = 0.1  # 10% damage/discontinuity
+    ```
+  </Step>
+
+  <Step title="Configure and run the simulation">
+    Call `run_basic_setup()` to assemble all components — medium field, stimulant source, and sensor array — and prepare the forward simulation. Set `use_p0=False` to use a Gaussian time pulse as the source (rather than a pressure field). Adjust `sensor_locations` to place receiver arrays along the edges of your domain.
+
+    ```python
+    simulator.run_basic_setup(
+        sensor_locations=['bottom', 'right'],
+        add_sensor_at_source=True,
+        use_p0=False,
+        amp=5,
+        pulse_source_loc=((62, 62), (62, 32)),
+        pulse_1_m=0.2,
+        pulse_2_m=0.52
+    )
+    ```
+
+    Setting `add_sensor_at_source=True` places an additional receiver near the source, which is useful for capturing the direct wave and performing source normalization during inversion.
+  </Step>
+
+  <Step title="Record waveforms">
+    Run the forward simulation by calling `compiled_simulator_sources()`. This propagates the stimulant through the heterogeneous medium and records the pressure field at each sensor for every time step.
+
+    ```python
+    sensors_data = simulator.compiled_simulator_sources()
+    # sensors_data shape: (n_sensors, n_timesteps)
+    ```
+
+    If your source is a pressure field (`use_p0=True`), use `compiled_simulator_sensors()` instead.
+  </Step>
+
+  <Step title="Apply Spec2Vec">
+    Feed the recorded sensor waveforms through the Spec2Vec pipeline. Convert each 1D trace to a spectrogram with `stft_basic_spectogram()`, then extract spectral fingerprints for all sensors in a single `compute_pointwise_metrics_from_spec()` call. The returned DataFrame has one row per sensor and one column per named Spec2Vec metric.
+
+    ```python
+    from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+    from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram
+
+    giq = GISQAPipeline()
+    feature_list = []
+    names_list = []
+
+    for i, sensor_trace in enumerate(sensors_data):
+        f_arr, t_arr, stft = stft_basic_spectogram(
+            sensor_trace, sr=1000, nperseg=64, overlap=0.5,
+            window='hann', f_min=0, f_max=None
+        )
+        names_list.append(f'sensor_{i}')
+        feature_list.append(stft)
+
+    features_df = giq.compute_pointwise_metrics_from_spec(
+        names_list, feature_list,
+        is_hilbertize=1, is_normalize_stat=0,
+        is_normalize_entropy=0, is_best_features=0,
+        ordpydx=5, antropydx=5,
+        metrics_list=None, hilbert_locs=None
+    )
+    ```
+  </Step>
+</Steps>
+
+## Medium Types
+
+The `Simulator` supports two fundamentally different approaches to constructing a heterogeneous medium. Choose the one that best matches the physical structure you want to model.
+
+<Tabs>
+  <Tab title="Graph Medium">
+    Graph-based media represent structural discontinuities as a network of nodes and edges overlaid on the simulation grid. Each connected component becomes a region with `defect_density` wave speed, while unconnected regions retain `base_density`. This produces sharp, binary contrasts — ideal for modeling fractured rock, jointed materials, or damaged infrastructure.
+
+    Set `simulator.graph_type` to any of the following options before calling `run_basic_setup()`:
+
+    | Graph Type | Character |
+    |---|---|
+    | `perlin_noise` | Smoothly varying fracture network (default) |
+    | `erdos_renyi_graph` / `ER` | Random graph with uniform connection probability |
+    | `scale_free` | Hub-dominated network with power-law degree distribution |
+    | `small_world` | High clustering with short average path lengths |
+    | `fractal_leaves` | Self-similar branching fracture pattern |
+    | `fractal_root` | Root-like dendritic discontinuity network |
+    | `fractal_hierarchy` / `fractal_star` | Hierarchical or star-shaped fractal patterns |
+    | `disconnected_cliques` | Isolated clusters of damaged material |
+
+    Control overall discontinuity density with `simulator.p_vals` (range 0–1). Higher values produce more connected, more heavily damaged media. Use `simulator.epsilon` (range 0–1) to tune deviation from the graph's ideal deterministic structure toward fully random topology.
+  </Tab>
+  <Tab title="Spatial Covariance Medium">
+    Spatial covariance media use geostatistical random field models to produce continuously varying wave-speed fields. Rather than sharp binary contrasts, these media have smooth spatial gradients with controllable correlation length, variance, and anisotropy — appropriate for modeling sedimentary layering, porous rock, or oceanic water columns.
+
+    Set `simulator.cov_model_name` to one of the following:
+
+    | Model | Correlation Shape |
+    |---|---|
+    | `Gaussian` | Smooth, differentiable correlations (default) |
+    | `Exponential` | Exponential decay; less smooth than Gaussian |
+    | `Matern` | Tunable smoothness via the `nu` parameter |
+    | `Spherical` | Compact support; zero correlation beyond range |
+    | `Circular` | Similar to Spherical with different transition shape |
+    | `Linear` | Linearly decreasing correlations |
+    | `Stable` | Generalized power-law decay |
+
+    Key tuning parameters: `cov_model_len_scale` controls the spatial range of correlation (larger = smoother medium), `cov_model_var` sets field variance, and `cov_model_angles` introduces anisotropy. Set `cov_model_transform_field=True` and pass `transform_mode` (e.g., `'Binary'`, `'LogNormal'`) to apply additional non-linear field transformations.
+
+    For full details on each covariance model, see the [GSTools documentation](https://geostat-framework.readthedocs.io/projects/gstools/en/stable/examples/02_cov_model/index.html).
+  </Tab>
+</Tabs>
+
+## Notebook Reference
+
+The `acoustic_signal_modeling/example_generate_waveform_models.ipynb` notebook contains a diverse set of worked examples covering different medium types, source configurations, and sensor placements. Start there to see practical demonstrations of all the parameters described above before designing your own experiments.

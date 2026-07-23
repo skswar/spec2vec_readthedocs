@@ -1,0 +1,205 @@
+---
+title: "Spec2Vec FAQ and Troubleshooting Guide"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about installing Spec2Vec, running notebooks, choosing between STFT and CWT, and interpreting spectral features."
+---
+
+This page answers the most common questions about setting up and using Spec2Vec, from choosing the right spectrogram type to understanding individual pipeline parameters and resolving environment issues.
+
+<AccordionGroup>
+
+  <Accordion title="How do I choose between STFT and CWT spectrograms?">
+    Both methods convert a 1D time-series into a 2D time-frequency representation, but they make different trade-offs:
+
+    - **STFT (`stft_basic_spectogram`)** uses a fixed window size, which gives you uniform time-frequency resolution across the entire signal. It is faster to compute and works well for signals whose frequency content is roughly stationary over time. This is a good first choice for most workflows.
+    - **CWT (`cwt_simple`)** uses wavelets that automatically widen at low frequencies and narrow at high frequencies, giving multi-resolution coverage. This makes CWT better at capturing short-lived transient features that vary rapidly in time. The trade-off is higher computational cost.
+
+    <Tip>
+      Start with STFT to establish a baseline. Switch to CWT if your signals contain fast transients or if STFT-based clustering does not separate your classes cleanly.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="What does `is_hilbertize` do?">
+    When you set `is_hilbertize=1`, Spec2Vec flattens your 2D spectrogram into a 1D array using a [Hilbert curve](https://en.wikipedia.org/wiki/Hilbert_curve) before computing pointwise features. A Hilbert curve is a space-filling fractal path that visits every cell of a 2D grid exactly once while preserving spatial locality — pixels that are close in 2D remain close in the flattened 1D array.
+
+    This step is **required** when your input is a 2D spectrogram image, because the underlying feature extractors (`antropy`, `ordpy`, `tsfel`) operate on 1D arrays. For direct 1D time-series input you can set `is_hilbertize=0`.
+
+    ```python
+    # 2D spectrogram input — must hilbertize
+    giq.compute_pointwise_metrics_from_spec(
+        names, [stft1, stft2],
+        is_hilbertize=1, ...
+    )
+
+    # 1D time-series input — no hilbertization needed
+    giq.compute_pointwise_metrics_from_spec(
+        names, [y1, y2],
+        is_hilbertize=0, ...
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Why does the first call take longer?">
+    Spec2Vec uses [Numba](https://numba.pydata.org/) for just-in-time (JIT) compilation of performance-critical inner loops. The very first time you call a Numba-compiled function in a Python session, Numba compiles it to native machine code for your specific CPU. This compilation step typically adds several seconds to the first call.
+
+    Every subsequent call in the same session skips compilation and runs at full native speed. You can expect a substantial speedup — often 10× or more — from the second call onward.
+
+    <Tip>
+      If you are benchmarking Spec2Vec performance, always discard the first call's timing or run a brief warm-up pass before starting your measurements.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="What are `ordpydx` and `antropydx`?">
+    These parameters set the **embedding dimension** for two families of entropy and complexity estimators:
+
+    - **`ordpydx`** controls the embedding dimension used by `ordpy`-based features (permutation entropy, statistical complexity, Fisher–Shannon information, and Rényi/Tsallis variants).
+    - **`antropydx`** controls the embedding dimension used by `antropy`-based features (approximate entropy, sample entropy, SVD entropy, and others).
+
+    In both cases, a higher embedding dimension causes the estimator to consider longer symbolic patterns in the signal, which can capture more complex structure. The cost is increased computation time and a larger minimum signal length requirement.
+
+    The **recommended range is 4–6** for most geophysical applications. Values below 3 are too coarse; values above 7 are rarely justified given typical seismic record lengths.
+
+    ```python
+    giq.compute_pointwise_metrics_from_spec(
+        names, signals,
+        ordpydx=5,    # ordpy embedding dimension
+        antropydx=5,  # antropy embedding dimension
+        ...
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="How do I reproduce paper results without downloading raw data?">
+    Pre-computed feature files are provided in the repository so you can run the analysis and visualization notebooks without re-processing the raw waveforms:
+
+    - **ESEC application:** pre-computed features live in `computed_dataset_files/` inside the `esec_catalog_clustering/` folder.
+    - **Synthetic geophysical signal clustering:** pre-computed data is in `synth_geophysical_signal_clustering/data/`.
+
+    Open the analysis notebooks in those folders and run them directly. The data-download and raw-processing cells at the top of each notebook are clearly labelled — you can skip them entirely if the pre-computed files are already present.
+  </Accordion>
+
+  <Accordion title="My notebook can't find the data files. What should I check?">
+    The most common cause is running the notebook from a directory other than the repository root. Spec2Vec notebooks use relative paths that are anchored to the repo root.
+
+    Try the following steps:
+
+    1. Change to the repository root before launching Jupyter:
+       ```bash
+       cd /path/to/Spec2Vec
+       jupyter lab
+       ```
+    2. Check the path variables defined at the top of the notebook (usually named `DATA_DIR`, `data_path`, or similar) and update them to match your local file structure.
+    3. Confirm the pre-computed files exist in the expected subdirectory by listing its contents:
+       ```bash
+       ls esec_catalog_clustering/computed_dataset_files/
+       ```
+
+    <Warning>
+      Do not move individual notebooks out of their parent application folder — they rely on sibling `data/` directories using relative paths.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Can I use Spec2Vec on non-geophysical time-series?">
+    Yes. Although Spec2Vec was developed and validated on geophysical and planetary signals, it is a general-purpose signal characterization framework. It extracts information-theoretic, statistical, and complexity-based features that are meaningful for any 1D time-series or 2D time-frequency representation.
+
+    Community applications include:
+
+    - **Biomedical signals** — EEG, ECG, and EMG characterization
+    - **Audio and acoustics** — environmental sound clustering, music genre analysis
+    - **Financial time-series** — volatility regime detection
+    - **Industrial monitoring** — vibration and fault-signature classification
+
+    The pipeline API is identical regardless of your domain. Simply pass your signals to `compute_pointwise_metrics_from_spec()` as you would with any seismic waveform.
+  </Accordion>
+
+  <Accordion title="What does `is_best_features=1` return?">
+    When you set `is_best_features=1`, Spec2Vec returns only the **5 most discriminating features** identified in the Spec2Vec research rather than the full feature set:
+
+    | Feature | Source library |
+    |---|---|
+    | `detrended_fluctuation_antropy` | antropy |
+    | `fisher_shannon_ordpy` | ordpy |
+    | `Lempel-Ziv complexity` | tsfel |
+    | `svd_entropy_antropy` | antropy |
+    | `approximate_entropy_antropy` | antropy |
+
+    Use this mode for a quick exploratory analysis, when computational resources are limited, or as a fast sanity-check before running the full feature extraction pipeline.
+
+    ```python
+    giq.compute_pointwise_metrics_from_spec(
+        names, signals,
+        is_best_features=1,   # return only the top 5 features
+        ...
+    )
+    ```
+
+    <Tip>
+      `is_best_features=1` is a good starting point for new datasets. If the 5-feature embedding already separates your signal classes well, you may not need the full feature set.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="I get an import error for `jwave` or `jax`. How do I fix it?">
+    `jwave` and `jax` are **optional dependencies** used exclusively by the acoustic wave propagation modeling module (`acoustic_signal_modeling/`). They are not required for core Spec2Vec feature extraction.
+
+    If you need them, install them with:
+
+    ```bash
+    pip install jwave jax jaxlib
+    ```
+
+    If you do not need acoustic modeling, you can safely ignore the import error — it will not affect `GISQAPipeline`, spectrogram generation, or any of the other application notebooks.
+
+    <Note>
+      On systems without a compatible GPU, install the CPU-only build of JAX: `pip install jax[cpu]`. GPU-enabled builds require matching CUDA and cuDNN versions; consult the [JAX installation guide](https://jax.readthedocs.io/en/latest/installation.html) for details.
+    </Note>
+  </Accordion>
+
+  <Accordion title="How do I run the time complexity benchmark on my hardware?">
+    The time complexity analysis scripts measure how the runtime of pointwise and pairwise metric extraction scales with image dimensions and sample size. To run the benchmark from the repository root:
+
+    ```bash
+    python SPEC2VEC/time_complexity_analysis/codes_and_files/analyze_time.py
+    ```
+
+    Before running, ensure your environment is fully set up with all required dependencies. You can verify this by installing from the hard requirements file:
+
+    ```bash
+    pip install -r software_requirements/spec2vec_requirements_hard.txt
+    ```
+
+    Results are written to the `time_complexity_analysis/` folder and can be visualized with the accompanying notebook in that directory.
+  </Accordion>
+
+  <Accordion title="What output format does Spec2Vec return?">
+    `compute_pointwise_metrics_from_spec()` returns a `pandas.DataFrame` where:
+
+    - Each **row** corresponds to one input signal (identified by the name string you passed in).
+    - Each **column** is a named feature metric (e.g., `permutation_entropy_antropy`, `Lempel-Ziv complexity`, `Kurtosis`).
+
+    This makes it straightforward to pipe the output directly into scikit-learn clustering or classification workflows:
+
+    ```python
+    from sklearn.cluster import KMeans
+
+    features_df = giq.compute_pointwise_metrics_from_spec(names, signals, ...)
+
+    # Drop any NaN columns and cluster
+    X = features_df.dropna(axis=1).values
+    labels = KMeans(n_clusters=3).fit_predict(X)
+    ```
+
+    The full list of available feature column names is documented in `available_features_list.txt` at the repository root.
+  </Accordion>
+
+  <Accordion title="Can I run Spec2Vec on a GPU?">
+    The core pointwise metrics pipeline runs on **CPU** and does not require a GPU. Numba JIT compilation targets your CPU architecture automatically.
+
+    GPU acceleration is available through the optional acoustic modeling module:
+
+    - The `acoustic_signal_modeling/` application uses [jwave](https://github.com/ucl-bug/jwave) and [JAX](https://github.com/google/jax) for physics-based wave propagation simulations.
+    - When JAX is installed with the appropriate CUDA backend, these simulations will automatically leverage your GPU or TPU.
+
+    To enable JAX GPU support, install the CUDA-compatible JAX build matching your driver version. See the [JAX installation guide](https://jax.readthedocs.io/en/latest/installation.html) for the correct command.
+  </Accordion>
+
+</AccordionGroup>

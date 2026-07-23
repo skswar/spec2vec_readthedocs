@@ -1,0 +1,363 @@
+---
+title: "GISQAPipeline API Reference"
+sidebarTitle: "GISQAPipeline"
+description: "Complete reference for the GISQAPipeline class: compute_pointwise_metrics_from_spec, execute_pairwise_pipeline, compute_imgbank_dict, and all other public methods."
+---
+
+`GISQAPipeline` is the primary interface for extracting spectral features from signals in Spec2Vec. It wraps both the pointwise (statistical, entropy, fractal) and pairwise (spatial zone) metric pipelines into a single, high-level object that you instantiate once and reuse across your entire analysis.
+
+## Import
+
+```python
+from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+
+giq = GISQAPipeline()
+```
+
+---
+
+## compute\_pointwise\_metrics\_from\_spec
+
+Computes pointwise feature metrics for a batch of signals or spectrograms and returns the results as a tidy `DataFrame`. Each row corresponds to one input signal; each column is a named feature.
+
+```python
+df = giq.compute_pointwise_metrics_from_spec(
+    spec_names=['signal_a', 'signal_b'],
+    spec_images=[array_a, array_b],
+    is_hilbertize=1,
+    is_normalize_stat=0,
+    is_normalize_entropy=0,
+    is_best_features=0,
+    ordpydx=5,
+    antropydx=5,
+    metrics_list=None,
+    hilbert_locs=None
+)
+```
+
+### Parameters
+
+<ParamField path="spec_names" type="list[str]" required>
+  Names or labels for each input signal. Must be the same length as `spec_images`. Each name becomes the identifying label for that signal's row in the output `DataFrame`.
+</ParamField>
+
+<ParamField path="spec_images" type="list[np.ndarray]" required>
+  List of input arrays. Each element can be either a 1D time-series array or a 2D spectrogram array (frequency × time). All arrays in the list may have different shapes.
+</ParamField>
+
+<ParamField path="is_hilbertize" type="int" default="1">
+  Set to `1` to apply Hilbert curve (space-filling curve) flattening before feature extraction. This is required for 2D spectrogram inputs so that the image is reduced to a 1D sequence while preserving spatial locality. Set to `0` when passing raw 1D time-series arrays.
+</ParamField>
+
+<ParamField path="is_normalize_stat" type="int" default="1">
+  Set to `1` to normalize all statistical and textural features to the `[0, 1]` range using `MinMaxScaler`. Set to `0` to return raw feature values.
+</ParamField>
+
+<ParamField path="is_normalize_entropy" type="int" default="0">
+  Set to `1` to normalize entropy-based features to `[0, 1]`. Entropy features are often already bounded by their mathematical definition, so normalization is optional.
+</ParamField>
+
+<ParamField path="is_best_features" type="int" default="1">
+  Set to `1` to return only the top five most discriminating features:
+  `detrended_fluctuation_antropy`, `fisher_shannon_ordpy`, `0_Lempel-Ziv complexity`, `svd_entropy_antropy`, and `approximate_entropy_antropy`. Set to `0` to return the full feature set (50+ features).
+</ParamField>
+
+<ParamField path="ordpydx" type="int" default="7">
+  Embedding dimension for `ordpy` entropy metrics (permutation entropy, statistical complexity, Fisher–Shannon information). Recommended range: **4–6** for balanced accuracy and speed. Higher values increase sensitivity to long-range patterns but also increase computation time.
+</ParamField>
+
+<ParamField path="antropydx" type="int" default="5">
+  Embedding dimension for `antropy` entropy metrics (permutation entropy, SVD entropy, approximate entropy, sample entropy). Recommended range: **4–6**.
+</ParamField>
+
+<ParamField path="metrics_list" type="list[str] or None" default="None">
+  An explicit list of feature names to compute, for example:
+  ```python
+  ['permutation_entropy_antropy', 'svd_entropy_antropy', 'detrended_fluctuation_antropy']
+  ```
+  When `None`, all available features are computed. Providing a subset substantially reduces runtime. This parameter overrides `is_best_features` when specified.
+</ParamField>
+
+<ParamField path="hilbert_locs" type="np.ndarray or None" default="None">
+  Pre-computed Hilbert curve index locations as a 2D array of shape `(N, 2)`, where each row is a `[row_idx, col_idx]` pair. When you process many images of the same resolution, pre-compute once with `HelperFunc.gilbertize_image()` and pass the result here to avoid repeating the computation on every call.
+</ParamField>
+
+### Returns
+
+<ResponseField name="spec_pointwise_metrics_df" type="pd.DataFrame">
+  A `DataFrame` where rows are indexed by position (with a `label` column containing `spec_names`) and columns are feature names. Shape is `(len(spec_names), n_features)`.
+</ResponseField>
+
+---
+
+## execute\_pointwise\_integration
+
+Computes pointwise features for a **single** spectrogram or 1D signal. This is the per-signal worker called internally by `compute_pointwise_metrics_from_spec`, but you can call it directly when you need per-signal control over filename labeling or want to inspect the intermediate `pointwise_features_integration` object via `giq.pofe`.
+
+```python
+metrics_df, feature_columns = giq.execute_pointwise_integration(
+    spec_img=my_array,
+    is_hilbertize=1,
+    is_normalize_stat=0,
+    is_normalize_entropy=0,
+    is_best_features=0,
+    filename='event_001',
+    metrics_list=None
+)
+```
+
+### Parameters
+
+<ParamField path="spec_img" type="np.ndarray" required>
+  A single 1D time-series array or 2D spectrogram array (frequency × time).
+</ParamField>
+
+<ParamField path="is_hilbertize" type="int" default="1">
+  Same as in `compute_pointwise_metrics_from_spec`. Set to `1` for 2D spectrogram inputs.
+</ParamField>
+
+<ParamField path="is_normalize_stat" type="int" default="1">
+  Normalize statistical features to `[0, 1]`.
+</ParamField>
+
+<ParamField path="is_normalize_entropy" type="int" default="0">
+  Normalize entropy features to `[0, 1]`.
+</ParamField>
+
+<ParamField path="is_best_features" type="int" default="1">
+  Return only the top 5 discriminating features.
+</ParamField>
+
+<ParamField path="filename" type="str" required>
+  A label string for this signal. Written into the `label` column of the returned `DataFrame`. Must be provided — the method will raise an `AssertionError` if omitted.
+</ParamField>
+
+<ParamField path="metrics_list" type="list[str] or None" default="None">
+  Subset of feature names to compute. Pass `None` to compute all features.
+</ParamField>
+
+### Returns
+
+<ResponseField name="pointwise_metrics_master_df" type="pd.DataFrame">
+  Single-row `DataFrame` containing all computed features plus a `label` column.
+</ResponseField>
+
+<ResponseField name="all_cols" type="list[str]">
+  List of all feature column names that were available for computation, regardless of filtering.
+</ResponseField>
+
+---
+
+## execute\_pairwise\_pipeline
+
+Runs the full pairwise spatial feature extraction pipeline for a single spectrogram image against a noise reference bank. The pipeline performs histogram alignment, Gaussian Mixture Model (GMM) labeling, and Gray-Level Size Zone Matrix (GLSZM) spatial metric computation in two refinement stages.
+
+<Warning>
+  This method requires a pre-built noise reference bank saved as an HDF5 file. Build one using `compute_imgbank_dict()` and save it with `h5py`, or use one of the pre-computed banks in `time_complexity_analysis/data_noise_ref/`.
+</Warning>
+
+```python
+glszm_metrics, spec_details = giq.execute_pairwise_pipleine(
+    t_plot=t_array,
+    f_plot=f_array,
+    spec_img=spectrogram_2d,
+    noisebnk_path='path/to/noise_bank.h5',
+    noisebnk_keys=['white_stft_w64_olap0.5', 'pink_stft_w64_olap0.5'],
+    binary_keys=[],
+    hist_bins=512,
+    noise_cutoff=90,
+    gmm_ncomp=5,
+    gmm_mean_threshold=0.05,
+    min_zone_size_thrshld=5,
+    filename='event_001',
+    save_path='./output_plots/',
+    save_all_plots=True
+)
+```
+
+### Parameters
+
+<ParamField path="t_plot" type="np.ndarray" required>
+  Time axis array for the spectrogram, as returned by `stft_basic_spectogram()` or `cwt_simple()`.
+</ParamField>
+
+<ParamField path="f_plot" type="np.ndarray" required>
+  Frequency axis array for the spectrogram.
+</ParamField>
+
+<ParamField path="spec_img" type="np.ndarray" required>
+  2D spectrogram array of shape `(n_freq, n_time)`.
+</ParamField>
+
+<ParamField path="noisebnk_path" type="str" required>
+  Filesystem path to the HDF5 noise reference bank (`.h5` file).
+</ParamField>
+
+<ParamField path="noisebnk_keys" type="list" required>
+  List of group keys inside the HDF5 file to use as reference noise templates. Each key corresponds to a noise type/configuration that was stored when the bank was built.
+</ParamField>
+
+<ParamField path="binary_keys" type="list" required>
+  List of keys in the noise bank that correspond to binary mask entries (i.e., images with only two intensity levels). These receive special treatment during histogram alignment.
+</ParamField>
+
+<ParamField path="hist_bins" type="int" default="512">
+  Number of histogram bins used for distribution alignment between the target spectrogram and each noise reference template.
+</ParamField>
+
+<ParamField path="noise_cutoff" type="int" default="90">
+  Percentile threshold for estimating the noise floor during histogram alignment. Pixels below this threshold in the realigned histogram are treated as noise.
+</ParamField>
+
+<ParamField path="gmm_ncomp" type="int" default="5">
+  Number of Gaussian components for GMM fitting. Controls the maximum number of distinct energy zones the pipeline attempts to identify in the spectrogram.
+</ParamField>
+
+<ParamField path="gmm_mean_threshold" type="float" default="0.05">
+  Minimum mean separation between adjacent GMM components. Components whose means are closer than this threshold are merged to prevent over-segmentation.
+</ParamField>
+
+<ParamField path="min_zone_size_thrshld" type="int" default="5">
+  Minimum number of contiguous pixels required to form a valid size zone in the GLSZM computation. Zones smaller than this threshold are treated as speckle noise and filtered out in stage 2.
+</ParamField>
+
+<ParamField path="filename" type="str">
+  Label string written into the `label` column of the returned metrics `DataFrame` and used as the base filename for saved plots.
+</ParamField>
+
+<ParamField path="save_path" type="str">
+  Directory path for saving intermediate visualization plots. Created automatically if it does not exist.
+</ParamField>
+
+<ParamField path="save_all_plots" type="bool" default="True">
+  When `True`, saves seven diagnostic plots covering the original spectrogram, aligned distributions, GMM cuts, labeled spectrograms, size zone variance, and the noise-filtered result.
+</ParamField>
+
+### Returns
+
+<ResponseField name="glszm_metrics" type="pd.DataFrame">
+  `DataFrame` containing stage-1 and stage-2 GLSZM spatial zone metrics. Stage-1 columns are suffixed `_stg1`; stage-2 (speckle-filtered) columns are suffixed `_stg2`. Also includes a `label` column.
+</ResponseField>
+
+<ResponseField name="updated_spec_details" type="dict">
+  Dictionary with keys `t_plot`, `f_plot`, `labeled_spec_image`, `arguments_dict`, `refined_labeled_spec_image`, and `spec_image_noise_cleaned`. Useful for downstream visualization or further analysis.
+</ResponseField>
+
+---
+
+## compute\_imgbank\_dict
+
+Generates a dictionary of noise spectrogram banks from a list of noise type labels and corresponding noise arrays. You can pass the result directly to `compute_noisebnk_metrics()` or save it to HDF5 for use with `execute_pairwise_pipeline()`.
+
+```python
+from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+
+giq = GISQAPipeline()
+
+img_bank = giq.compute_imgbank_dict(
+    spec_types=['stft'],
+    noiselist=['white', 'pink', 'red'],
+    Fs=100,
+    time_in_sec=10,
+    total_realizations=50,
+    save_path='noise_bank.h5'
+)
+```
+
+### Parameters
+
+<ParamField path="spec_types" type="list" required>
+  List of spectrogram (or spatial structure) types to generate. Supported values include `'stft'`, `'cwt'`, `'perlin_noise'`, `'erdos_renyi_graph'`, `'Gaussian'`, `'Exponential'`, and `'pspy_fractal_noise'`. For standard geophysical workflows, use `['stft']` or `['cwt']`.
+</ParamField>
+
+<ParamField path="noiselist" type="list" required>
+  List of colored noise color strings to generate spectrograms for. Supported values: `'white'`, `'pink'`, `'red'`, `'blue'`, `'violet'`, `'f3'`, `'f4'`. Ignored for non-time-series spec types.
+</ParamField>
+
+<ParamField path="Fs" type="int" required>
+  Sampling frequency in Hz for noise time-series generation.
+</ParamField>
+
+<ParamField path="time_in_sec" type="int" required>
+  Duration in seconds for each generated noise segment. Combined with `Fs` to set the total number of samples (`L = Fs × time_in_sec`).
+</ParamField>
+
+<ParamField path="total_realizations" type="int" default="50">
+  Number of independent noise realizations to generate per noise type and spectrogram configuration. More realizations provide a more stable reference distribution.
+</ParamField>
+
+<ParamField path="save_path" type="str">
+  If provided, the generated bank is written to this HDF5 file path. The file can then be passed as `noisebnk_path` to `execute_pairwise_pipeline()`.
+</ParamField>
+
+<ParamField path="interp_size" type="tuple or None" default="None">
+  Target image dimensions `(height, width)` for interpolating all spectrograms to a common resolution. Useful when mixing STFT windows of different sizes.
+</ParamField>
+
+<ParamField path="normalize_range" type="tuple" default="(1e-8, 1)">
+  Normalization range applied to each generated spectrogram image.
+</ParamField>
+
+### Returns
+
+<ResponseField name="spec_dict" type="dict">
+  Dictionary mapping noise group names (e.g., `'white_stft_w64_olap0.5'`) to sub-dictionaries containing `'image'` (shape `[realizations, 1, H, W]`), `'hilbert_image'`, `'time_series'`, `'f'`, and `'t'` arrays.
+</ResponseField>
+
+---
+
+## compute\_noisebnk\_metrics
+
+Extracts pointwise feature metrics for every entry in a noise reference bank. You can provide either a path to an existing HDF5 bank or the in-memory dictionary returned by `compute_imgbank_dict()`. The result is a `DataFrame` in the same format as `compute_pointwise_metrics_from_spec()`, suitable for use as a reference distribution in downstream pointwise feature-difference analysis.
+
+```python
+noise_metrics_df = giq.compute_noisebnk_metrics(
+    noise_bnk_path='noise_bank.h5',
+    img_bank_dict={},
+    max_realizations=100,
+    is_hilbertize=1,
+    is_normalize_stat=1,
+    is_best_features=0,
+    metrics_list=None
+)
+```
+
+### Parameters
+
+<ParamField path="noise_bnk_path" type="str" default="">
+  Path to an HDF5 noise bank file. If provided, the file is opened and iterated over. Takes priority over `img_bank_dict` when both are supplied.
+</ParamField>
+
+<ParamField path="img_bank_dict" type="dict" default="{}">
+  In-memory bank dictionary as returned by `compute_imgbank_dict()`. Used when `noise_bnk_path` is empty.
+</ParamField>
+
+<ParamField path="max_realizations" type="int" default="100">
+  Maximum number of noise realizations to process per noise group. Useful for controlling runtime during exploratory analysis.
+</ParamField>
+
+<ParamField path="is_hilbertize" type="int" default="1">
+  Apply Hilbert curve flattening to each noise image before feature extraction.
+</ParamField>
+
+<ParamField path="is_normalize_stat" type="int" default="1">
+  Normalize statistical features to `[0, 1]`.
+</ParamField>
+
+<ParamField path="is_best_features" type="int" default="0">
+  Return only the top 5 discriminating features. Set to `0` to compute the full feature set for comprehensive noise characterization.
+</ParamField>
+
+<ParamField path="metrics_list" type="list[str] or None" default="None">
+  Specific feature names to compute. Pass `None` for all features.
+</ParamField>
+
+<ParamField path="save_path" type="str">
+  If provided, the resulting `DataFrame` is saved to this CSV path after each noise group completes, acting as a checkpoint.
+</ParamField>
+
+### Returns
+
+<ResponseField name="spec_pointwise_metrics_df" type="pd.DataFrame">
+  Feature `DataFrame` for all noise bank entries. The `label` column contains the noise group key (e.g., `'white_stft_w64_olap0.5'`). Use this as the reference distribution for `execute_pointwise_featurediff_pipeline()`.
+</ResponseField>

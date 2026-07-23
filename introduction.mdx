@@ -1,0 +1,71 @@
+---
+title: "Spec2Vec: Interpretable Spectral Representations of Signals"
+sidebarTitle: "Introduction"
+description: "Spec2Vec extracts physics-aware spectral embeddings from geophysical signals. Learn what it does, who it is for, and how it differs from black-box approaches."
+---
+
+Spec2Vec addresses a fundamental challenge in signal analysis: how do you systematically describe what a signal looks like without relying on subjective inspection or opaque neural networks? The framework solves this by computing a reproducible suite of information-theoretic, statistical, and spatial metrics from any 1D time-series or its 2D time-frequency representation, producing a compact feature vector — a "spectral fingerprint" — that you can feed directly into clustering, classification, or dimensionality-reduction workflows.
+
+## What is Spec2Vec?
+
+Spec2Vec is an intelligent framework for extracting objective, interpretable feature embeddings from geophysical signals. Given a waveform or a spectrogram image, Spec2Vec computes a rich set of numerical descriptors — entropy measures, complexity indices, statistical moments, and spatial texture metrics — and assembles them into a single feature vector that uniquely identifies the signal's character.
+
+The core insight is that a spectrogram, when traversed along a space-filling Hilbert curve, becomes a 1D sequence that preserves spatial locality. Spec2Vec exploits this to apply 1D time-series metrics to 2D spectrogram images without discarding the spatial structure of the representation. The result is a transparent, physics-aware workflow: every feature has a clear mathematical definition, every result is reproducible, and no training data is required. This makes Spec2Vec a principled alternative to black-box deep learning models for signal characterization tasks where interpretability and consistency matter.
+
+## Who Is It For?
+
+Spec2Vec is designed for researchers and practitioners who work with 1D time-series or time-frequency data and need embeddings they can explain. This includes:
+
+- **Seismologists and geophysicists** who need to classify or cluster earthquake waveforms, tremor, or noise without training a neural network on labeled data.
+- **Planetary scientists** studying signals from remote sensing instruments where labeled datasets are scarce or non-existent.
+- **Signal processing researchers** who want a reproducible, feature-based baseline for comparing signal types.
+- **Data scientists** working with any domain involving structured 1D or 2D temporal data who value transparency over black-box performance.
+
+If you have a collection of signals that you need to characterize, compare, or group — and you want to understand *why* signals are being grouped the way they are — Spec2Vec is built for you.
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card
+    title="Pointwise Feature Extraction"
+    icon="chart-bar"
+  >
+    Compute entropy, complexity, and statistical features from a single signal or spectrogram image using the `GISQAPipeline.compute_pointwise_metrics_from_spec()` method.
+  </Card>
+  <Card
+    title="Pairwise Spatial Metrics"
+    icon="arrows-left-right"
+  >
+    Compare a target spectrogram against a reference noise bank using histogram alignment, GMM labeling, and gray-level size-zone matrix (GLSZM) texture metrics.
+  </Card>
+  <Card
+    title="Spectrogram Generation"
+    icon="image"
+  >
+    Convert raw 1D waveforms into STFT or CWT time-frequency representations using `stft_basic_spectogram()` and `cwt_simple()` from `spectograms_lib.py`.
+  </Card>
+  <Card
+    title="Acoustic Modeling"
+    icon="wave-square"
+  >
+    Build synthetic waveforms propagating through complex heterogeneous physical media using the `Simulator` class, powered by `jwave` and `jax` (optional dependency).
+  </Card>
+</CardGroup>
+
+## Supported Applications
+
+Spec2Vec ships with four domain application folders, each containing Jupyter notebooks and sample data. These cover Distributed Acoustic Sensing (DAS) array characterization, Exotic Seismic Event Catalog (ESEC) clustering of tectonic and non-tectonic earthquakes, synthetic geophysical signal clustering for prototyping and benchmarking, and physics-based acoustic signal modeling for studying wave propagation in heterogeneous media. Each application folder contains its own `app_readme.md` with domain-specific guidance.
+
+## Repository Structure
+
+The repository separates backend utilities from domain application notebooks, making it straightforward to import core functions into your own project or explore a specific application end-to-end.
+
+- **`utils/`** — The core engine of Spec2Vec. Contains all Python source files for metric computation, spectrogram generation, noise synthesis, pipeline orchestration, and plotting. Most users will import exclusively from this directory.
+- **`das_application/`**, **`esec_catalog_clustering/`**, **`synth_geophysical_signal_clustering/`**, **`acoustic_signal_modeling/`** — Domain application folders, each containing a `data/` subdirectory, a `notebooks/` subdirectory, and an `app_readme.md`.
+- **`software_requirements/`** — Text files listing hard and soft Python dependencies.
+- **`other_useful_notebooks/`** — Miscellaneous notebooks for data exploration, noise bank preparation, and side experiments.
+- **`time_complexity_analysis/`** — Benchmarking scripts for runtime performance across different image dimensions and sample sizes.
+
+<Tip>
+  Always run notebooks and scripts from the repository root directory. Spec2Vec uses relative imports (e.g., `from SPEC2VEC.utils...`), and the root must be on your Python path for these to resolve correctly.
+</Tip>

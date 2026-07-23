@@ -1,0 +1,113 @@
+---
+title: "How Spec2Vec Works: Framework Architecture Overview"
+sidebarTitle: "Overview"
+description: "Understand Spec2Vec's two-stage architecture: pointwise metrics from individual spectrograms and pairwise metrics comparing signals against a noise reference bank."
+---
+
+Spec2Vec converts raw geophysical signals into compact, interpretable vector embeddings by systematically computing a suite of information-theoretic, statistical, and spatial metrics across the signal's time-frequency representation. Rather than relying on a neural network whose internal reasoning is opaque, every number in a Spec2Vec embedding has a name and a physical meaning — making results auditable, reproducible, and portable across datasets without retraining.
+
+## Two-stage feature extraction
+
+Spec2Vec organises its metric computation into two complementary stages. You can run either stage independently or chain them together depending on how much contextual information you have about the noise environment.
+
+<Steps>
+  <Step title="Stage 1 — Pointwise metrics">
+    Scalar features are extracted directly from a single signal or its spectrogram in isolation. The pipeline flattens the 2D time-frequency representation (TFR) into a 1D trace using a Hilbert space-filling curve to preserve spatial locality, then computes entropy measures, fractal dimensions, and statistical moments on that trace.
+
+    **What you get:** a one-row DataFrame of named scalars — permutation entropy, Higuchi fractal dimension, root mean square, Lempel-Ziv complexity, and dozens more — derived entirely from the signal itself, with no external reference needed.
+  </Step>
+  <Step title="Stage 2 — Pairwise metrics">
+    Spatial features are extracted by comparing the target spectrogram against a pre-built **noise reference bank** — a library of spectrograms from known noise processes (white, pink, red, blue, violet noise, and others). The comparison involves three sub-operations:
+
+    1. **Histogram alignment** — the target's amplitude distribution is aligned to the closest noise reference via cross-correlation and optimisation, isolating the signal-of-interest from background noise.
+    2. **GMM labeling** — a Gaussian Mixture Model fits the residual (signal minus noise) distribution and assigns integer energy-level labels to each pixel in the TFR.
+    3. **GLSZM spatial zone metrics** — a Gray-Level Size Zone Matrix quantifies how large and how localised high-energy patches are in the labeled TFR. Outputs include Small Area Emphasis, Large Area Emphasis, Gray Level Non-Uniformity, and more.
+
+    **What you get:** spatial descriptors that capture *where* and *how concentrated* signal energy is within the time-frequency plane.
+  </Step>
+</Steps>
+
+<Note>
+  For most quick-start workflows you only need Stage 1. Stage 2 requires that you first build or supply a noise bank (an HDF5 file), and it is better suited for production pipelines where you need maximum discriminative power on noisy real-world data.
+</Note>
+
+## Input types
+
+Spec2Vec accepts signals at two levels of pre-processing:
+
+<CardGroup cols={2}>
+  <Card title="Raw 1D time-series" icon="wave-sine">
+    Pass a NumPy array directly to `compute_pointwise_metrics_from_spec()` with `is_hilbertize=0`. The pipeline flattens the 1D signal and computes all metrics without a spectrogram step.
+  </Card>
+  <Card title="2D time-frequency representations" icon="grid-2">
+    Pass a 2D spectrogram (STFT or CWT scalogram) with `is_hilbertize=1`. The Hilbert curve flattening step is activated, converting the image into a spatially coherent 1D trace before metric extraction.
+  </Card>
+</CardGroup>
+
+Both STFT spectrograms (`stft_basic_spectogram`) and CWT scalograms (`cwt_simple`) are supported natively inside `utils/spectograms_lib.py`. You can also supply any externally generated 2D array of the same shape.
+
+## Output
+
+`GISQAPipeline.compute_pointwise_metrics_from_spec()` returns a **pandas DataFrame** where:
+
+- Each **row** corresponds to one input signal (identified by its entry in `spec_names`).
+- Each **column** is a named feature such as `permutation_entropy_antropy`, `detrended_fluctuation_antropy`, or `Lempel-Ziv complexity`.
+- A `label` column carries the signal name for traceability.
+
+This tidy tabular output plugs directly into scikit-learn classifiers, UMAP/t-SNE projectors, or any clustering algorithm without further transformation.
+
+```python
+import numpy as np
+from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+
+giq = GISQAPipeline()
+df = giq.compute_pointwise_metrics_from_spec(
+    ['signal_a', 'signal_b'],
+    [array_a, array_b],
+    is_hilbertize=1,
+    is_normalize_stat=0,
+    is_normalize_entropy=0,
+    is_best_features=0,
+    ordpydx=5, antropydx=5,
+    metrics_list=None, hilbert_locs=None
+)
+
+print(df.shape)          # (2, N_features + 1)
+print(df.columns[:5])    # First five feature names
+```
+
+## Interpretability advantage
+
+Traditional deep-learning approaches encode signals into latent vectors whose dimensions are abstract and interchangeable. Spec2Vec takes the opposite approach: every dimension in its embedding vector corresponds to a **mathematically defined, physically grounded quantity**.
+
+| Property | Deep learning embedding | Spec2Vec embedding |
+|---|---|---|
+| Feature meaning | Implicit / uninterpretable | Named, documented metric |
+| Physics awareness | None (data-driven only) | Entropy, fractal dimension, energy statistics |
+| Retraining required | Yes, for new domains | No — metrics are domain-agnostic |
+| Reproducibility | Depends on random seed | Fully deterministic |
+| Explainability (SHAP) | Possible but indirect | Direct — feature names map to quantities |
+
+This makes Spec2Vec particularly valuable in scientific settings where a reviewer or stakeholder needs to understand *why* two signals were placed in the same cluster.
+
+## Repository layout
+
+```
+📦 SPEC2VEC
+├── utils/                          ← Core engine (import from here)
+│   ├── gisqa_compute_updated.py    ← GISQAPipeline main class
+│   ├── gisqa_pointwise_metrics_updated.py  ← Antropy, ordpy, TSFEL extractors
+│   ├── gisqa_pairwise_metrics.py   ← Histogram alignment, GMM, GLSZM
+│   ├── spectograms_lib.py          ← STFT and CWT spectrogram generators
+│   ├── noise_lib.py                ← Colored noise generators
+│   └── gisqa_helper.py             ← Utility functions (Hilbert curve, scaling)
+├── das_application/                ← Distributed Acoustic Sensing notebooks
+├── esec_catalog_clustering/        ← Earthquake catalog clustering notebooks
+├── synth_geophysical_signal_clustering/  ← Synthetic waveform clustering
+├── acoustic_signal_modeling/       ← Physics-based acoustic simulation
+├── other_useful_notebooks/         ← Exploration and prototyping notebooks
+├── software_requirements/          ← Hard and soft dependency files
+└── available_features_list.txt     ← Master list of all computable features
+```
+
+The `utils/` folder is the only directory you need to import for embedding generation. Domain application folders each contain their own `app_readme.md`, notebooks, and data subdirectories that demonstrate end-to-end workflows on specific signal types.

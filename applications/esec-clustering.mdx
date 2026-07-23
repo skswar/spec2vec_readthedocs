@@ -1,0 +1,71 @@
+---
+title: "Clustering Exotic Seismic Events with Spec2Vec"
+sidebarTitle: "ESEC Clustering"
+description: "Reproduce the ESEC catalog analysis: download seismic waveforms, compute Spec2Vec features, and cluster exotic vs. tectonic earthquake signatures."
+---
+
+The ESEC application demonstrates how Spec2Vec can distinguish exotic seismic events — landslides, debris flows, and other non-tectonic surface events — from standard tectonic earthquakes purely from their spectral fingerprints. Rather than relying on hand-crafted phase picks or analyst labels, Spec2Vec computes a rich set of information-theoretic and statistical metrics from each event's spectrogram and lets those feature vectors drive clustering, producing separation between event classes that reflects genuine physical differences in source mechanism and wave propagation.
+
+<Warning>
+Before running any scripts in this workflow, open each Python file and update the global path variables at the top to match your local directory structure. All scripts read input data and write output files using these variables, and they will fail silently or with misleading errors if the paths are incorrect.
+</Warning>
+
+## Datasets
+
+Two catalogs drive this analysis:
+
+- **ESEC (Exotic Seismic Event Catalog):** A curated database of non-tectonic events — including landslides, glacial calving events, and debris flows — sourced from [IRIS SPUD](https://ds.iris.edu/spud/). The master reference catalog is `Master_ESEC_Catalog_vel_all.csv`, included in the `esec_catalog_clustering/` directory.
+- **Tectonic EQ Catalog:** A manually curated set of conventional tectonic earthquakes downloaded via [IRIS Wilber 3](https://ds.iris.edu/wilber3/find_event). The master reference catalog is `Master_tectonic_eq_catalog.csv`, also included in the directory.
+
+## Directory Structure
+
+The `esec_catalog_clustering/` directory is organized as follows:
+
+| Folder / File | Contents |
+|---|---|
+| `esec_raw_data/` | Raw downloaded ESEC waveforms |
+| `esec_processed_vel/` | Processed ESEC velocity traces |
+| `eq_raw_data/` | Raw tectonic earthquake downloads |
+| `eq_processed_vel/` | Processed tectonic EQ velocity traces |
+| `computed_dataset_files/` | Pre-computed Spec2Vec feature CSVs |
+| `spec2vec_analysis_notebooks/` | Analysis and figure-generation notebooks |
+
+## Step-by-Step Workflow
+
+<Steps>
+  <Step title="Download and process ESEC data">
+    Run `step1_esec_catalog_dataprepandprocess.py`. This script reads `Master_ESEC_Catalog_vel_all.csv`, queries the IRIS web services, and downloads raw waveforms for each catalogued event. Remember to update the global path variables at the top of the file first.
+
+    **Output:** Raw ESEC waveform files saved into `esec_raw_data/`.
+  </Step>
+
+  <Step title="Process tectonic EQ data">
+    Run `step2_tectonic_eq_dataprepandprocess.py`. Because the tectonic earthquake data is manually downloaded via IRIS Wilber 3, this script focuses on applying standard signal processing routines — detrending, filtering, and instrument response removal — to the existing waveform files.
+
+    **Output:** Processed velocity traces saved into `eq_processed_vel/`.
+  </Step>
+
+  <Step title="Compute Spec2Vec features">
+    Run `step3_spec2vec_metrics_prep.py`. This script reads all processed waveforms from both catalogs, converts each trace to a spectrogram, and feeds the spectrograms through the `GISQAPipeline` to extract the full Spec2Vec feature suite.
+
+    **Output:** Feature CSV files written to `computed_dataset_files/`, one per event class or combined, ready for analysis.
+  </Step>
+
+  <Step title="Analyze and reproduce paper results">
+    Open `spec2vec_analysis_notebooks/spec2vec_analysis_main.ipynb` in Jupyter and run it from top to bottom. The notebook loads the feature CSVs from `computed_dataset_files/`, performs dimensionality reduction, clustering, and statistical comparisons, and regenerates the figures presented in the Spec2Vec publication.
+  </Step>
+</Steps>
+
+<Tip>
+**Skip to results immediately:** Pre-computed feature files are already available in `computed_dataset_files/`. If you just want to reproduce the paper figures without downloading or processing any raw data, open `spec2vec_analysis_notebooks/spec2vec_analysis_main.ipynb` directly and run it — Steps 1–3 are entirely optional.
+</Tip>
+
+## Optional Visualizations
+
+After completing the core workflow, three additional scripts let you generate deeper visual analyses:
+
+- **Reference input figures** — Run `optional_input_figures_ref_prep.py` to generate reference plots of the raw input signals for both the ESEC and tectonic EQ catalogs. Outputs are saved to `esec_spec2vec_ip_figures/` and `eq_spec2vec_ip_figures/` (pre-generated figures are already included in those folders for immediate inspection).
+
+- **Comprehensive metric plots** — Run `optional_comprehensive_metrics_plots.py` to produce detailed visualizations of every computed Spec2Vec feature, useful for exploratory analysis and feature selection. Outputs are saved to `comprehensive_metrics_plots/`.
+
+- **Rolling analysis** — Run `optional_esec_spec2vec_rolling_metrics_prep.py` to apply Spec2Vec on a rolling basis over N-second chunks of each time series rather than the full waveform. This sliding-window approach lets you track how spectral fingerprints evolve through an event and is particularly useful for long-duration exotic events such as sustained debris flows.

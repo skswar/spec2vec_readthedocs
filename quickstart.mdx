@@ -1,47 +1,136 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Spec2Vec in Minutes"
+sidebarTitle: "Quickstart"
+description: "Extract spectral fingerprints from 1D time-series signals using Spec2Vec's GISQAPipeline in just a few lines of Python."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+In this guide you will generate two synthetic 1D signals, extract a full set of pointwise spectral features from the raw waveforms, then go one step further and extract features from a 2D STFT spectrogram. By the end you will have a pandas DataFrame of interpretable spectral fingerprints ready for clustering, classification, or visualization — all in fewer than 30 lines of Python.
 
 ## Prerequisites
 
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+<Note>
+  This guide assumes you have already installed Spec2Vec and its dependencies. If you have not done that yet, follow the [Installation](/installation) guide first and make sure your `spec2vec_env` conda environment is activated before running the code below.
+</Note>
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Import Spec2Vec">
+    Start by importing NumPy and the two Spec2Vec modules you will use: the `GISQAPipeline` class for feature extraction and `stft_basic_spectogram` for generating time-frequency representations.
 
-    ```bash
-    npm install your-package
+    ```python
+    import numpy as np
+    from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
+    from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
 
-    ```bash
-    your-cli init
+  <Step title="Create a test signal">
+    Generate two synthetic signals — each is a sinusoidal burst shaped by a Gaussian envelope. The signals differ in frequency (35 Hz vs. 20 Hz) and in when the burst peaks (4 s vs. 1 s), so they represent two clearly distinct signal types.
+
+    ```python
+    sr = 100  # Sampling rate in Hz
+    t = 5     # Duration in seconds
+    x = np.linspace(0, t, sr * t)
+
+    # 35 Hz burst peaking near t = 4 s
+    y1 = np.sin(2 * np.pi * 35 * x) * np.exp(-((x - 4) ** 2) / (2 * 0.3 ** 2))
+
+    # 20 Hz burst peaking near t = 1 s
+    y2 = np.sin(2 * np.pi * 20 * x) * np.exp(-((x - 1) ** 2) / (2 * 0.3 ** 2))
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
 
-    ```bash
-    your-cli start
+  <Step title="Extract pointwise features from raw 1D signals">
+    Instantiate `GISQAPipeline` and call `compute_pointwise_metrics_from_spec()` with your signal names and arrays. Setting `is_hilbertize=0` tells Spec2Vec to treat each input as a 1D sequence rather than a 2D image — no Hilbert curve traversal is needed for raw waveforms.
+
+    ```python
+    giq = GISQAPipeline()
+
+    features_df = giq.compute_pointwise_metrics_from_spec(
+        ['signal_1', 'signal_2'],
+        [y1, y2],
+        is_hilbertize=0,
+        is_normalize_stat=0,
+        is_normalize_entropy=0,
+        is_best_features=0,
+        ordpydx=4,
+        antropydx=4,
+        metrics_list=None,
+        hilbert_locs=None
+    )
+
+    print(features_df)
     ```
+
+    The returned `features_df` is a pandas DataFrame with one row per signal. Each column is a named spectral feature — entropy measures, complexity indices, statistical moments, and more. You can pass this DataFrame directly to `sklearn` for clustering or dimensionality reduction.
+  </Step>
+
+  <Step title="Extract features from a 2D spectrogram">
+    For richer characterization, you can first convert a waveform into a Short-Time Fourier Transform (STFT) spectrogram and then extract features from the resulting 2D image. Setting `is_hilbertize=1` activates Hilbert curve flattening, which traverses the 2D spectrogram along a space-filling curve before computing features — preserving the spatial structure of the image.
+
+    ```python
+    # Generate an STFT spectrogram from y1
+    f, t_arr, stft = stft_basic_spectogram(
+        y1, sr, nperseg=64, overlap=0.5,
+        window='hann', f_min=0, f_max=50,
+        max_normalize=False, powerlog=False,
+        vmin_percentile=2, vmax_percentile=98
+    )
+
+    # Extract features from the 2D spectrogram
+    features_df_2d = giq.compute_pointwise_metrics_from_spec(
+        ['signal_1'],
+        [stft],
+        is_hilbertize=1,
+        is_normalize_stat=0,
+        is_normalize_entropy=0,
+        is_best_features=0,
+        ordpydx=5,
+        antropydx=5,
+        metrics_list=[
+            'permutation_entropy_antropy',
+            'spectral_entropy_antropy',
+            'svd_entropy_antropy',
+            'detrended_fluctuation_antropy'
+        ],
+        hilbert_locs=None
+    )
+
+    print(features_df_2d)
+    ```
+
+    Passing a `metrics_list` restricts computation to only the named features, which is useful when you want a lightweight embedding or when you already know which features are most discriminative for your application.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## What's Next
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card
+    title="Pipeline Concepts"
+    icon="diagram-project"
+    href="/concepts/pipeline"
+  >
+    Dive deeper into how GISQAPipeline orchestrates pointwise and pairwise operations under the hood.
+  </Card>
+  <Card
+    title="Feature Catalog"
+    icon="list-check"
+    href="/concepts/feature-catalog"
+  >
+    Browse the full list of available spectral features and learn what each one measures.
+  </Card>
+  <Card
+    title="ESEC Catalog Clustering"
+    icon="circle-nodes"
+    href="/applications/esec-clustering"
+  >
+    See how Spec2Vec is used to cluster tectonic and non-tectonic earthquake waveforms.
+  </Card>
+  <Card
+    title="DAS Array Analysis"
+    icon="wave-square"
+    href="/applications/das"
+  >
+    Explore processing and characterization workflows for fiber-optic DAS array data.
+  </Card>
+</CardGroup>
