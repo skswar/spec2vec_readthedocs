@@ -19,16 +19,14 @@ The recommended approach is to install Spec2Vec inside a dedicated conda virtual
     cd Spec2Vec
     ```
   </Step>
-
   <Step title="Create a conda environment">
-    Create a new conda environment named `spec2vec_env` with Python 3.10 and the core scientific stack. This single command installs `numpy`, `matplotlib`, `pandas`, `scikit-learn`, `scipy`, `seaborn`, and Jupyter tooling together, so conda can resolve their interdependencies correctly.
+    Create a new conda environment named e.g. `spec2vec_env` with Python 3.10 (or above) and the core scientific stack. This single command installs `numpy`, `matplotlib`, `pandas`, `scikit-learn`, `scipy`, `seaborn`, and Jupyter tooling together, so conda can resolve their interdependencies correctly.
 
     ```bash
     conda create -n spec2vec_env python=3.10 numpy=2.2 matplotlib pandas \
         scikit-learn scipy seaborn notebook jupyterlab
     ```
   </Step>
-
   <Step title="Activate the environment">
     Switch into your new environment before installing any additional packages.
 
@@ -36,16 +34,14 @@ The recommended approach is to install Spec2Vec inside a dedicated conda virtual
     conda activate spec2vec_env
     ```
   </Step>
-
   <Step title="Install additional dependencies">
-    Install the remaining Spec2Vec dependencies via pip. These packages cover HDF5 I/O, wavelet transforms, JIT compilation, time-series feature extraction, entropy and complexity measures, spatial indexing, and network analysis.
+    Install the remaining Spec2Vec dependencies via pip (please check the [spec2vec\_requirements\_soft.txt](https://github.com/URseismology/Spec2Vec/blob/main/software_requirements/spec2vec_requirements_soft.txt "spec2vec_requirements_soft.txt")). These packages cover time-series feature extraction, entropy and complexity measures, spatial indexing, HDF5 I/O, wavelet transforms, JIT compilation, network analysis etc required for the library.
 
     ```bash
     pip install h5py PyWavelets numba tsfel antropy ordpy pyradiomics \
         numpy-hilbert-curve gstools structify-net networkx shap
     ```
   </Step>
-
   <Step title="Optional: Acoustic modeling dependencies">
     If you plan to run the acoustic signal modeling notebooks, install the `jwave` simulation library and its `jax` backend. These packages are GPU-accelerated and are only needed for the `acoustic_signal_modeling/` application folder.
 
@@ -64,11 +60,13 @@ The recommended approach is to install Spec2Vec inside a dedicated conda virtual
 If you prefer a single command over the step-by-step approach above, you can install all hard dependencies at once using the pinned requirements file included in the repository.
 
 <CodeGroup>
-  ```bash conda + pip
-  conda create -n spec2vec_env python=3.10
-  conda activate spec2vec_env
-  pip install -r software_requirements/spec2vec_requirements_hard.txt
-  ```
+
+```bash conda + pip
+conda create -n spec2vec_env python=3.10
+conda activate spec2vec_env
+pip install -r software_requirements/spec2vec_requirements_hard.txt
+```
+
 </CodeGroup>
 
 The `spec2vec_requirements_hard.txt` file contains pinned versions for every dependency, which guarantees a reproducible environment identical to the one used during development.
