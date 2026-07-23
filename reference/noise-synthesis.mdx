@@ -23,7 +23,7 @@ from SPEC2VEC.utils.simple_synth_data_models import (
 
 ---
 
-## ColoredNoiseGenerator
+## ColoredNoiseGenerator (Class)
 
 `ColoredNoiseGenerator` generates time-series of different spectral colors by shaping white Gaussian noise in the frequency domain. Instantiate it with the desired number of samples `N`, then call any color method.
 
@@ -66,7 +66,7 @@ The table below summarizes the spectral shape of each noise color and its typica
 
 ---
 
-## white\_noise\_series
+## white\_noise\_series (function)
 
 Generates a simple white noise time-series drawn from a normal distribution. This is a standalone function — use it when you need a quick white noise segment without instantiating `ColoredNoiseGenerator`.
 
@@ -102,7 +102,7 @@ ts = white_noise_series(L=1000, amp=1, mu=0, sd=1)
 
 ---
 
-## ar\_driven\_noise\_series
+## ar\_driven\_noise\_series (function)
 
 Generates a noise time-series from a linear autoregressive (AR) system driven by white noise. The AR coefficients `a_k` define the resonant structure of the output signal. You can use this to synthesize signals with known spectral shapes (e.g., narrow-band resonances) for testing your pipeline.
 
@@ -167,7 +167,7 @@ ts, times, freq_series, freqs, psd = ar_driven_noise_series(
 
 ---
 
-## psd\_driven\_noise\_series
+## psd\_driven\_noise\_series (function)
 
 Synthesizes a noise time-series directly from a custom PSD curve you supply. Use this when you have a measured or modeled PSD and want to generate realizations of a signal with that exact spectral shape.
 
