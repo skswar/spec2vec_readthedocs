@@ -43,41 +43,6 @@ DAS systems turn a single fiber-optic cable into thousands of co-located seismom
   </Step>
 </Steps>
 
-## Key Code Snippet
-
-The example below illustrates the full load-and-process pattern for a single DAS channel. Wrap this in a loop over `range(n_channels)` to process the entire array.
-
-```python
-import h5py
-import numpy as np
-from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
-from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram
-
-# Load DAS data from HDF5
-with h5py.File('path/to/das_data.h5', 'r') as f:
-    das_data = f['data'][:]     # shape: (n_channels, n_samples)
-    sr = f['sampling_rate'][()]
-
-# Process a single channel
-channel = das_data[0]
-f_arr, t_arr, stft = stft_basic_spectogram(
-    channel, sr, nperseg=64, overlap=0.5,
-    window='hann', f_min=0, f_max=50,
-    max_normalize=False, powerlog=False,
-    vmin_percentile=2, vmax_percentile=98
-)
-
-# Extract spectral fingerprint
-giq = GISQAPipeline()
-features = giq.compute_pointwise_metrics_from_spec(
-    ['channel_0'], [stft],
-    is_hilbertize=1, is_normalize_stat=0,
-    is_normalize_entropy=0, is_best_features=0,
-    ordpydx=5, antropydx=5,
-    metrics_list=None, hilbert_locs=None
-)
-```
-
 ## Notebook Reference
 
 For the complete end-to-end walkthrough — including multi-channel batch processing, pre/post-event window selection, and publication-quality visualization — open `das_application/das_application.ipynb` and run it from top to bottom after completing the setup steps above.
