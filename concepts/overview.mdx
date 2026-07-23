@@ -1,7 +1,7 @@
 ---
 title: "How Spec2Vec Works: Framework Architecture Overview"
 sidebarTitle: "Overview"
-description: "Understand Spec2Vec's two-stage architecture: pointwise metrics from individual spectrograms and pairwise metrics against a noise reference bank."
+description: "Understand Spec2Vec's two-stage architecture: pointwise (texture and spatial features) from individual time-series/spectrograms and pairwise (spatial features) against a noise reference bank filtering."
 ---
 
 Spec2Vec converts raw geophysical signals into compact, interpretable vector embeddings by systematically computing a suite of information-theoretic, statistical, and spatial metrics across the signal's time-frequency representation. Rather than relying on a neural network whose internal reasoning is opaque, every number in a Spec2Vec embedding has a name and a physical meaning — making results auditable, reproducible, and portable across datasets without retraining.
@@ -17,13 +17,13 @@ Spec2Vec organises its metric computation into two complementary stages. You can
     **What you get:** a one-row DataFrame of named scalars — permutation entropy, Higuchi fractal dimension, root mean square, Lempel-Ziv complexity, and dozens more — derived entirely from the signal itself, with no external reference needed.
   </Step>
   <Step title="Stage 2 — Pairwise metrics">
-    Spatial features are extracted by comparing the target spectrogram against a pre-built **noise reference bank** — a library of spectrograms from known noise processes (white, pink, red, blue, violet noise, and others). The comparison involves three sub-operations:
+    Spatial features are extracted by comparing the target spectrogram against a pre-built **noise reference bank** — a library of spectrograms from known noise processes (white, pink, red, blue, violet noise, and others). One can also supply their own pre-computed noise reference files. The comparison involves three sub-operations:
 
-    1. **Histogram alignment** — the target's amplitude distribution is aligned to the closest noise reference via cross-correlation and optimisation, isolating the signal-of-interest from background noise.
+    1. **Histogram alignment** — the target's amplitude distribution is aligned to the closest noise reference via cross-correlation and optimization, isolating the signal-of-interest from background noise.
     2. **GMM labeling** — a Gaussian Mixture Model fits the residual (signal minus noise) distribution and assigns integer energy-level labels to each pixel in the TFR.
-    3. **GLSZM spatial zone metrics** — a Gray-Level Size Zone Matrix quantifies how large and how localised high-energy patches are in the labeled TFR. Outputs include Small Area Emphasis, Large Area Emphasis, Gray Level Non-Uniformity, and more.
+    3. **GLSZM spatial zone metrics** — a Gray-Level Size Zone Matrix quantifies how large and how localized high-energy patches are in the labeled TFR. Outputs include Small Area Emphasis, Large Area Emphasis, Gray Level Non-Uniformity, and more.
 
-    **What you get:** spatial descriptors that capture *where* and *how concentrated* signal energy is within the time-frequency plane.
+    **What you get:** spatial descriptors that capture _where_ and _how concentrated_ signal energy is within the time-frequency plane.
   </Step>
 </Steps>
 
@@ -39,19 +39,20 @@ Spec2Vec accepts signals at two levels of pre-processing:
   <Card title="Raw 1D time-series" icon="wave-sine">
     Pass a NumPy array directly to `compute_pointwise_metrics_from_spec()` with `is_hilbertize=0`. The pipeline flattens the 1D signal and computes all metrics without a spectrogram step.
   </Card>
+
   <Card title="2D time-frequency representations" icon="grid-2">
     Pass a 2D spectrogram (STFT or CWT scalogram) with `is_hilbertize=1`. The Hilbert curve flattening step is activated, converting the image into a spatially coherent 1D trace before metric extraction.
   </Card>
 </CardGroup>
 
-Both STFT spectrograms (`stft_basic_spectogram`) and CWT scalograms (`cwt_simple`) are supported natively inside `utils/spectograms_lib.py`. Note that `cwt_simple()` returns four values — `f`, `t`, `spectro`, and the raw complex coefficient matrix `cwtmatr_cmplx` — so unpack accordingly. You can also supply any externally generated 2D array of the same shape.
+Both STFT spectrograms (`stft_basic_spectogram`) and CWT scalograms (`cwt_simple`) are supported natively inside `utils/spectograms_lib.py`. You can also supply any externally generated 2D array .
 
 ## Output
 
 `GISQAPipeline.compute_pointwise_metrics_from_spec()` returns a **pandas DataFrame** where:
 
 - Each **row** corresponds to one input signal (identified by its entry in `spec_names`).
-- Each **column** is a named feature such as `permutation_entropy_antropy`, `detrended_fluctuation_antropy`, or `Lempel-Ziv complexity`.
+- Each **column** is a named feature such as `permutation_entropy_antropy`, `detrended_fluctuation_antropy`, or `Lempel-Ziv complexity` etc..
 - A `label` column carries the signal name for traceability.
 
 This tidy tabular output plugs directly into scikit-learn classifiers, UMAP/t-SNE projectors, or any clustering algorithm without further transformation.
@@ -81,14 +82,14 @@ print(df.columns[:5])    # First five feature names
 Traditional deep-learning approaches encode signals into latent vectors whose dimensions are abstract and interchangeable. Spec2Vec takes the opposite approach: every dimension in its embedding vector corresponds to a **mathematically defined, physically grounded quantity**.
 
 | Property | Deep learning embedding | Spec2Vec embedding |
-|---|---|---|
+| --- | --- | --- |
 | Feature meaning | Implicit / uninterpretable | Named, documented metric |
 | Physics awareness | None (data-driven only) | Entropy, fractal dimension, energy statistics |
 | Retraining required | Yes, for new domains | No — metrics are domain-agnostic |
 | Reproducibility | Depends on random seed | Fully deterministic |
 | Explainability (SHAP) | Possible but indirect | Direct — feature names map to quantities |
 
-This makes Spec2Vec particularly valuable in scientific settings where a reviewer or stakeholder needs to understand *why* two signals were placed in the same cluster.
+This makes Spec2Vec particularly valuable in scientific settings where a reviewer or stakeholder needs to understand _why_ two signals were placed in the same cluster.
 
 ## Repository layout
 
