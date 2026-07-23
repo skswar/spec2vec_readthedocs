@@ -1,7 +1,7 @@
 ---
 title: "How Spec2Vec Works: Framework Architecture Overview"
 sidebarTitle: "Overview"
-description: "Understand Spec2Vec's two-stage architecture: pointwise metrics from individual spectrograms and pairwise metrics comparing signals against a noise reference bank."
+description: "Understand Spec2Vec's two-stage architecture: pointwise metrics from individual spectrograms and pairwise metrics against a noise reference bank."
 ---
 
 Spec2Vec converts raw geophysical signals into compact, interpretable vector embeddings by systematically computing a suite of information-theoretic, statistical, and spatial metrics across the signal's time-frequency representation. Rather than relying on a neural network whose internal reasoning is opaque, every number in a Spec2Vec embedding has a name and a physical meaning — making results auditable, reproducible, and portable across datasets without retraining.
@@ -44,7 +44,7 @@ Spec2Vec accepts signals at two levels of pre-processing:
   </Card>
 </CardGroup>
 
-Both STFT spectrograms (`stft_basic_spectogram`) and CWT scalograms (`cwt_simple`) are supported natively inside `utils/spectograms_lib.py`. You can also supply any externally generated 2D array of the same shape.
+Both STFT spectrograms (`stft_basic_spectogram`) and CWT scalograms (`cwt_simple`) are supported natively inside `utils/spectograms_lib.py`. Note that `cwt_simple()` returns four values — `f`, `t`, `spectro`, and the raw complex coefficient matrix `cwtmatr_cmplx` — so unpack accordingly. You can also supply any externally generated 2D array of the same shape.
 
 ## Output
 
@@ -65,10 +65,10 @@ df = giq.compute_pointwise_metrics_from_spec(
     ['signal_a', 'signal_b'],
     [array_a, array_b],
     is_hilbertize=1,
-    is_normalize_stat=0,
+    is_normalize_stat=0,   # override default of 1
     is_normalize_entropy=0,
-    is_best_features=0,
-    ordpydx=5, antropydx=5,
+    is_best_features=0,    # override default of 1 to get all features
+    ordpydx=7, antropydx=5,
     metrics_list=None, hilbert_locs=None
 )
 
@@ -92,7 +92,7 @@ This makes Spec2Vec particularly valuable in scientific settings where a reviewe
 
 ## Repository layout
 
-```
+```text
 📦 SPEC2VEC
 ├── utils/                          ← Core engine (import from here)
 │   ├── gisqa_compute_updated.py    ← GISQAPipeline main class

@@ -1,7 +1,7 @@
 ---
-title: "Spec2Vec Performance and Time Complexity"
+title: "Spec2Vec Performance Benchmarks and Time Complexity"
 sidebarTitle: "Performance"
-description: "Understand Spec2Vec's runtime scaling with spectrogram resolution. Benchmark data for 128×128, 256×256, and 512×512 inputs, plus optimization tips."
+description: "Spec2Vec runtime scaling by resolution: benchmark results, optimization tips, and Numba warm-up guidance for large-batch spectrogram processing."
 ---
 
 Spec2Vec's computation time scales with spectrogram image resolution. Understanding this scaling helps you choose the right resolution for your application and set realistic expectations for large-batch processing jobs. The two main metric families — pointwise (statistical, entropy, fractal) and pairwise (spatial zone) — have different scaling behaviors and can be tuned independently.
@@ -10,7 +10,7 @@ Spec2Vec's computation time scales with spectrogram image resolution. Understand
 
 ## Benchmarks
 
-The `time_complexity_analysis/` directory contains a benchmarking script and pre-computed noise reference banks at three standard resolutions. The table below shows wall-clock times measured on a consistent hardware setup for batches of 50, 100, 500, and 1000 spectrograms at each resolution.
+The `time_complexity_analysis/` directory contains a benchmarking script and pre-computed noise reference banks at three standard resolutions. The table below shows wall-clock times from the pre-computed results file `time_complexity_analysis/codes_and_files/time_complexity_results_diff_dims.csv`, measured on a single CPU core for batches of 50, 100, 500, and 1000 spectrograms at each resolution.
 
 ### Timing Results
 
@@ -45,6 +45,8 @@ Raw results are stored in `time_complexity_analysis/codes_and_files/time_complex
 
 ## Optimization Strategies
 
+<AccordionGroup>
+
 <Accordion title="Use metrics_list to select specific features">
   Computing the full feature suite (50+ metrics) is often unnecessary, especially during prototyping. Pass a `metrics_list` to `compute_pointwise_metrics_from_spec()` to compute only the features you need.
 
@@ -68,30 +70,6 @@ Raw results are stored in `time_complexity_analysis/codes_and_files/time_complex
   ```
 
   Computing 4 features instead of 50+ can reduce pointwise runtime by 10–15×, depending on which features you select. Entropy metrics are generally faster than fractal dimension metrics.
-</Accordion>
-
-<Accordion title="Pre-compute Hilbert curve locations">
-  When you process many signals at the same spectrogram resolution, the Hilbert (Gilbert) curve index computation is repeated identically on every call. Pre-compute it once and pass the result via the `hilbert_locs` keyword argument.
-
-  ```python
-  from SPEC2VEC.utils.gisqa_helper import HelperFunc
-
-  H, W = 128, 128  # your spectrogram dimensions
-  hilbert_locs = HelperFunc.gilbertize_image(width=H, height=W)
-
-  df = giq.compute_pointwise_metrics_from_spec(
-      spec_names=signal_names,
-      spec_images=signal_arrays,
-      is_hilbertize=1,
-      is_normalize_stat=0,
-      is_normalize_entropy=0,
-      is_best_features=0,
-      metrics_list=None,
-      hilbert_locs=hilbert_locs   # reused on every iteration
-  )
-  ```
-
-  For a batch of 1000 signals this eliminates 1000 redundant curve-generation calls. The benefit scales linearly with batch size.
 </Accordion>
 
 <Accordion title="Use is_best_features=1 for maximum speed">
@@ -150,6 +128,8 @@ Raw results are stored in `time_complexity_analysis/codes_and_files/time_complex
   #     df = giq.compute_pointwise_metrics_from_spec([name], [spec], ...)
   ```
 </Accordion>
+
+</AccordionGroup>
 
 ---
 

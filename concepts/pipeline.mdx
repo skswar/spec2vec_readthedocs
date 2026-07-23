@@ -1,7 +1,7 @@
 ---
-title: "GISQAPipeline: The Spec2Vec Processing Pipeline"
+title: "GISQAPipeline: Spec2Vec Pointwise and Pairwise Features"
 sidebarTitle: "Pipeline"
-description: "Learn how to use GISQAPipeline to extract pointwise and pairwise spectral features from signals, with configuration options for normalization and feature selection."
+description: "Use GISQAPipeline to extract named spectral features from signals or spectrograms, with controls for normalization, embedding depth, and feature selection."
 ---
 
 `GISQAPipeline` is the main entry point to Spec2Vec. It is a high-level class that wraps both pointwise and pairwise feature extraction into a clean API, letting you go from a list of raw arrays to a labelled pandas DataFrame in a single method call. You instantiate it once and then call whichever extraction method fits your workflow — there is no configuration file to edit and no subclassing required.
@@ -25,10 +25,10 @@ df = giq.compute_pointwise_metrics_from_spec(
     spec_names,
     spec_images,
     is_hilbertize=1,
-    is_normalize_stat=0,
+    is_normalize_stat=1,   # default: normalise statistical features
     is_normalize_entropy=0,
-    is_best_features=0,
-    ordpydx=5,
+    is_best_features=1,    # default: return only the top 5 features
+    ordpydx=7,
     antropydx=5,
     metrics_list=None,
     hilbert_locs=None
@@ -49,20 +49,20 @@ df = giq.compute_pointwise_metrics_from_spec(
   Set to `1` to enable Hilbert curve flattening for 2D spectrogram inputs. The pipeline automatically selects the standard Hilbert curve for square power-of-2 images and the generalised Gilbertised curve for rectangular images. Set to `0` when passing 1D time-series arrays directly.
 </ParamField>
 
-<ParamField path="is_normalize_stat" type="int" default="0">
-  Set to `1` to normalise the flattened signal to the range `[-1, 1]` before computing **statistical features** (mean, variance, kurtosis, etc.). Normalisation is performed with `MinMaxScaler`. Normalising statistical features can improve comparability across signals with different amplitude scales.
+<ParamField path="is_normalize_stat" type="int" default="1">
+  Set to `1` to normalise the flattened signal to the range `[-1, 1]` before computing **statistical features** (mean, variance, kurtosis, etc.). Normalisation is performed with `MinMaxScaler`. Normalising statistical features can improve comparability across signals with different amplitude scales. Enabled by default.
 </ParamField>
 
 <ParamField path="is_normalize_entropy" type="int" default="0">
   Set to `1` to normalise the flattened signal before computing **entropy and fractal features** (permutation entropy, DFA, etc.). Note that some entropy measures — particularly `svd_entropy_antropy` — are sensitive to the amplitude scaling of the input, so evaluate whether normalisation helps or hurts for your specific dataset.
 </ParamField>
 
-<ParamField path="is_best_features" type="int" default="0">
-  Set to `1` to return only the five most discriminating features identified across geophysical datasets: `detrended_fluctuation_antropy`, `fisher_shannon_ordpy`, `Lempel-Ziv complexity`, `svd_entropy_antropy`, and `approximate_entropy_antropy`. When `metrics_list` is also provided, `is_best_features` is overridden by `metrics_list`.
+<ParamField path="is_best_features" type="int" default="1">
+  When `1` (the default), the pipeline returns only the five most discriminating features identified across geophysical datasets: `detrended_fluctuation_antropy`, `fisher_shannon_ordpy`, `Lempel-Ziv complexity`, `svd_entropy_antropy`, and `approximate_entropy_antropy`. Set to `0` to compute all available features. When `metrics_list` is also provided, `metrics_list` takes precedence regardless of this flag.
 </ParamField>
 
-<ParamField path="ordpydx" type="int" default="5">
-  The embedding dimension (`dx`) passed to all `ordpy` feature computations. Controls the length of ordinal patterns evaluated (pattern length = `ordpydx`). Recommended range: **4–6**. Higher values capture longer-range correlations but increase computation time and require longer input signals.
+<ParamField path="ordpydx" type="int" default="7">
+  The embedding dimension (`dx`) passed to all `ordpy` feature computations. Controls the length of ordinal patterns evaluated (pattern length = `ordpydx`). Recommended range: **4–8**. Higher values capture longer-range correlations but increase computation time and require longer input signals.
 </ParamField>
 
 <ParamField path="antropydx" type="int" default="5">
@@ -112,10 +112,10 @@ df = giq.compute_pointwise_metrics_from_spec(
     ['signal_35hz', 'signal_20hz'],
     [stft1, stft2],
     is_hilbertize=1,       # Enable Hilbert curve for 2D input
-    is_normalize_stat=0,
+    is_normalize_stat=1,   # default: normalise statistical features
     is_normalize_entropy=0,
-    is_best_features=0,    # Compute all features
-    ordpydx=5,
+    is_best_features=0,    # override default to compute all features
+    ordpydx=7,
     antropydx=5,
     metrics_list=None,
     hilbert_locs=None
@@ -129,7 +129,11 @@ print(df.columns.tolist()) # All feature names plus 'label'
 
 ## Pairwise pipeline
 
-The pairwise pipeline, accessed through `execute_pairwise_pipeline()`, compares a target spectrogram against a pre-built **noise reference bank** to extract spatial zone metrics. It is more computationally expensive than the pointwise pipeline but provides richer discriminative features for noisy real-world data.
+The pairwise pipeline, accessed through `execute_pairwise_pipleine()`, compares a target spectrogram against a pre-built **noise reference bank** to extract spatial zone metrics. It is more computationally expensive than the pointwise pipeline but provides richer discriminative features for noisy real-world data.
+
+<Note>
+  The method is spelled `execute_pairwise_pipleine` (note the transposed letters in "pipeline") — this matches the current source exactly. Use this spelling when calling the method in your own code.
+</Note>
 
 ### The three sub-steps
 
@@ -174,7 +178,7 @@ Two independent normalisation flags let you control whether the flattened signal
   </Card>
 </CardGroup>
 
-Both flags default to `0` (disabled). You can enable them independently — for example, `is_normalize_stat=1, is_normalize_entropy=0` normalises only the statistical branch.
+`is_normalize_stat` defaults to `1` (enabled) while `is_normalize_entropy` defaults to `0` (disabled). You can set them independently — for example, `is_normalize_stat=0, is_normalize_entropy=0` disables both, or `is_normalize_stat=1, is_normalize_entropy=1` enables both branches.
 
 ---
 
@@ -190,9 +194,9 @@ Setting `is_best_features=1` returns exactly five features that have been empiri
 df = giq.compute_pointwise_metrics_from_spec(
     spec_names, spec_images,
     is_hilbertize=1,
-    is_best_features=1,     # Return only the top 5
-    ordpydx=5, antropydx=5,
-    is_normalize_stat=0, is_normalize_entropy=0,
+    is_best_features=1,     # this is the default — returns only the top 5
+    ordpydx=7, antropydx=5,
+    is_normalize_stat=1, is_normalize_entropy=0,
     metrics_list=None, hilbert_locs=None
 )
 # df will have 6 columns: the 5 best features + 'label'
@@ -216,8 +220,8 @@ df = giq.compute_pointwise_metrics_from_spec(
     spec_names, spec_images,
     is_hilbertize=1,
     metrics_list=metrics_to_compute,
-    ordpydx=5, antropydx=5,
-    is_normalize_stat=0, is_normalize_entropy=0,
+    ordpydx=7, antropydx=5,
+    is_normalize_stat=1, is_normalize_entropy=0,
     is_best_features=0, hilbert_locs=None
 )
 ```
@@ -255,10 +259,10 @@ giq = GISQAPipeline()
 df = giq.compute_pointwise_metrics_from_spec(
     ['my_signal'], [stft],
     is_hilbertize=1,
-    is_normalize_stat=0,
+    is_normalize_stat=1,   # default: normalise statistical features
     is_normalize_entropy=0,
-    is_best_features=0,
-    ordpydx=5,
+    is_best_features=0,    # override default to compute all features
+    ordpydx=7,
     antropydx=5,
     metrics_list=None,
     hilbert_locs=None

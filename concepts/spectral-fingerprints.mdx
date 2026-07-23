@@ -1,7 +1,7 @@
 ---
-title: "What Are Spectral Fingerprints in Spec2Vec?"
+title: "Spectral Fingerprints: How Spec2Vec Encodes Signals"
 sidebarTitle: "Spectral Fingerprints"
-description: "Learn how Spec2Vec creates a unique spectral fingerprint for each signal using information-theoretic, statistical, and spatial metrics across time-frequency representations."
+description: "Learn how Spec2Vec builds a unique spectral fingerprint using entropy, fractal, and statistical metrics extracted from time-frequency representations."
 ---
 
 Just as a fingerprint uniquely identifies a person from the arrangement of ridges and whorls in their skin, a spectral fingerprint uniquely identifies a signal from the arrangement of energy across time and frequency. Spec2Vec constructs this identity numerically: it extracts over 50 named scalar metrics from a signal's time-frequency representation and concatenates them into a single fixed-length vector. Two signals with similar physical character — the same source mechanism, propagation path, or noise environment — will land close together in that vector space, while signals of different character will be far apart.
@@ -19,7 +19,7 @@ Before any metrics are computed, a 1D time-series must be mapped into a 2D time-
   </Card>
 </CardGroup>
 
-Both functions return a frequency array `f`, a time array `t`, and the 2D spectrogram matrix `spectro`. The matrix is the input to the fingerprinting pipeline.
+Both functions return a frequency array `f`, a time array `t`, and the 2D spectrogram matrix `spectro`. `cwt_simple()` additionally returns a fourth value — `cwtmatr_cmplx`, the raw complex CWT coefficient matrix — so unpack it as `f, t, spectro, cwtmatr_cmplx = cwt_simple(...)` if you need the phase information, or use `f, t, spectro, _ = cwt_simple(...)` to discard it. The `spectro` matrix is the input to the fingerprinting pipeline.
 
 <Tip>
   You do not have to use these built-in spectrogram functions. Any 2D NumPy array — a mel-spectrogram, a wavelet packet transform matrix, or a short-time power spectrum — can be passed directly to the pipeline as long as it has a consistent shape across your dataset.
@@ -101,7 +101,7 @@ Once the spectrogram has been flattened to a 1D trace, three families of metrics
 
 When you set `is_best_features=1`, Spec2Vec returns only the five metrics that have been empirically identified as the most discriminating across geophysical signal datasets:
 
-```
+```text
 detrended_fluctuation_antropy
 fisher_shannon_ordpy
 Lempel-Ziv complexity

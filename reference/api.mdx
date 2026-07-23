@@ -1,7 +1,7 @@
 ---
-title: "GISQAPipeline API Reference"
+title: "GISQAPipeline API Reference: Methods and Parameters"
 sidebarTitle: "GISQAPipeline"
-description: "Complete reference for the GISQAPipeline class: compute_pointwise_metrics_from_spec, execute_pairwise_pipeline, compute_imgbank_dict, and all other public methods."
+description: "Complete reference for GISQAPipeline: compute pointwise metrics, run pairwise spatial pipelines, build noise banks, and extract features from spectrograms."
 ---
 
 `GISQAPipeline` is the primary interface for extracting spectral features from signals in Spec2Vec. It wraps both the pointwise (statistical, entropy, fractal) and pairwise (spatial zone) metric pipelines into a single, high-level object that you instantiate once and reuse across your entire analysis.
@@ -28,10 +28,7 @@ df = giq.compute_pointwise_metrics_from_spec(
     is_normalize_stat=0,
     is_normalize_entropy=0,
     is_best_features=0,
-    ordpydx=5,
-    antropydx=5,
-    metrics_list=None,
-    hilbert_locs=None
+    metrics_list=None
 )
 ```
 
@@ -62,24 +59,12 @@ df = giq.compute_pointwise_metrics_from_spec(
   `detrended_fluctuation_antropy`, `fisher_shannon_ordpy`, `0_Lempel-Ziv complexity`, `svd_entropy_antropy`, and `approximate_entropy_antropy`. Set to `0` to return the full feature set (50+ features).
 </ParamField>
 
-<ParamField path="ordpydx" type="int" default="7">
-  Embedding dimension for `ordpy` entropy metrics (permutation entropy, statistical complexity, Fisher–Shannon information). Recommended range: **4–6** for balanced accuracy and speed. Higher values increase sensitivity to long-range patterns but also increase computation time.
-</ParamField>
-
-<ParamField path="antropydx" type="int" default="5">
-  Embedding dimension for `antropy` entropy metrics (permutation entropy, SVD entropy, approximate entropy, sample entropy). Recommended range: **4–6**.
-</ParamField>
-
 <ParamField path="metrics_list" type="list[str] or None" default="None">
   An explicit list of feature names to compute, for example:
   ```python
   ['permutation_entropy_antropy', 'svd_entropy_antropy', 'detrended_fluctuation_antropy']
   ```
-  When `None`, all available features are computed. Providing a subset substantially reduces runtime. This parameter overrides `is_best_features` when specified.
-</ParamField>
-
-<ParamField path="hilbert_locs" type="np.ndarray or None" default="None">
-  Pre-computed Hilbert curve index locations as a 2D array of shape `(N, 2)`, where each row is a `[row_idx, col_idx]` pair. When you process many images of the same resolution, pre-compute once with `HelperFunc.gilbertize_image()` and pass the result here to avoid repeating the computation on every call.
+  When `None`, all available features are computed (subject to `is_best_features`). Providing a subset substantially reduces runtime.
 </ParamField>
 
 ### Returns
@@ -92,7 +77,7 @@ df = giq.compute_pointwise_metrics_from_spec(
 
 ## execute\_pointwise\_integration
 
-Computes pointwise features for a **single** spectrogram or 1D signal. This is the per-signal worker called internally by `compute_pointwise_metrics_from_spec`, but you can call it directly when you need per-signal control over filename labeling or want to inspect the intermediate `pointwise_features_integration` object via `giq.pofe`.
+Computes pointwise features for a **single** spectrogram or 1D signal. This is the per-signal worker called internally by `compute_pointwise_metrics_from_spec`, but you can call it directly when you need per-signal control or want to inspect the intermediate `pointwise_features_integration` object via `giq.pofe`.
 
 ```python
 metrics_df, feature_columns = giq.execute_pointwise_integration(
@@ -129,11 +114,15 @@ metrics_df, feature_columns = giq.execute_pointwise_integration(
 </ParamField>
 
 <ParamField path="filename" type="str" required>
-  A label string for this signal. Written into the `label` column of the returned `DataFrame`. Must be provided — the method will raise an `AssertionError` if omitted.
+  A label string for this signal. Written into the `label` column of the returned `DataFrame`. The method raises an `AssertionError` if this argument is not provided.
 </ParamField>
 
 <ParamField path="metrics_list" type="list[str] or None" default="None">
   Subset of feature names to compute. Pass `None` to compute all features.
+</ParamField>
+
+<ParamField path="filtered_features" type="list or None" default="None">
+  Optional list of feature names to exclude from the output after computation. Useful when you want to suppress specific metrics without changing the computation path.
 </ParamField>
 
 ### Returns
@@ -148,7 +137,11 @@ metrics_df, feature_columns = giq.execute_pointwise_integration(
 
 ---
 
-## execute\_pairwise\_pipeline
+## execute\_pairwise\_pipleine
+
+<Warning>
+  Note: the method name in the source contains a typo — it is spelled `execute_pairwise_pipleine` (not `pipeline`). Use this exact spelling when calling the method.
+</Warning>
 
 Runs the full pairwise spatial feature extraction pipeline for a single spectrogram image against a noise reference bank. The pipeline performs histogram alignment, Gaussian Mixture Model (GMM) labeling, and Gray-Level Size Zone Matrix (GLSZM) spatial metric computation in two refinement stages.
 
@@ -209,12 +202,24 @@ glszm_metrics, spec_details = giq.execute_pairwise_pipleine(
   Percentile threshold for estimating the noise floor during histogram alignment. Pixels below this threshold in the realigned histogram are treated as noise.
 </ParamField>
 
+<ParamField path="corr_only" type="bool" default="False">
+  When `True`, performs only the correlation-based histogram alignment step and skips the exponential optimization. Useful for a fast first-pass inspection of the noise fit quality.
+</ParamField>
+
 <ParamField path="gmm_ncomp" type="int" default="5">
   Number of Gaussian components for GMM fitting. Controls the maximum number of distinct energy zones the pipeline attempts to identify in the spectrogram.
 </ParamField>
 
 <ParamField path="gmm_mean_threshold" type="float" default="0.05">
   Minimum mean separation between adjacent GMM components. Components whose means are closer than this threshold are merged to prevent over-segmentation.
+</ParamField>
+
+<ParamField path="gmm_nbins" type="int" default="256">
+  Number of bins used when constructing the histogram passed to GMM fitting.
+</ParamField>
+
+<ParamField path="spec_normalize" type="str" default="'full'">
+  Normalization strategy applied to the spectrogram before GMM fitting. Pass `'full'` to normalize across the entire image, or `'row'` to normalize each frequency row independently.
 </ParamField>
 
 <ParamField path="min_zone_size_thrshld" type="int" default="5">
@@ -230,7 +235,19 @@ glszm_metrics, spec_details = giq.execute_pairwise_pipleine(
 </ParamField>
 
 <ParamField path="save_all_plots" type="bool" default="True">
-  When `True`, saves seven diagnostic plots covering the original spectrogram, aligned distributions, GMM cuts, labeled spectrograms, size zone variance, and the noise-filtered result.
+  When `True`, saves diagnostic plots covering the original spectrogram, aligned distributions, GMM cuts, labeled spectrograms, size zone variance, and the noise-filtered result.
+</ParamField>
+
+<ParamField path="best_neighbour_key" type="str or None" default="None">
+  When provided, skips the automatic nearest-neighbour search and uses this key directly as the noise reference template. Useful when you already know the best-matching noise type for your signal class.
+</ParamField>
+
+<ParamField path="optimization_params" type="dict">
+  Dictionary controlling the exponential optimization used during histogram alignment. Keys are `'type'`, `'start'`, `'end'`, and `'slope'`. Defaults to `{'type': 'exponential', 'start': 0.1, 'end': 100, 'slope': 10}`.
+</ParamField>
+
+<ParamField path="scale_percentile_range" type="tuple" default="(1, 100)">
+  Percentile range `(lower, upper)` used when scaling the spectrogram pixel values during noise filtering.
 </ParamField>
 
 ### Returns
@@ -247,7 +264,7 @@ glszm_metrics, spec_details = giq.execute_pairwise_pipleine(
 
 ## compute\_imgbank\_dict
 
-Generates a dictionary of noise spectrogram banks from a list of noise type labels and corresponding noise arrays. You can pass the result directly to `compute_noisebnk_metrics()` or save it to HDF5 for use with `execute_pairwise_pipeline()`.
+Generates a dictionary of noise spectrogram banks from a list of noise type labels and corresponding noise arrays. You can pass the result directly to `compute_noisebnk_metrics()` or save it to HDF5 for use with `execute_pairwise_pipleine()`.
 
 ```python
 from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
@@ -286,8 +303,12 @@ img_bank = giq.compute_imgbank_dict(
   Number of independent noise realizations to generate per noise type and spectrogram configuration. More realizations provide a more stable reference distribution.
 </ParamField>
 
+<ParamField path="dt" type="float or None" default="None">
+  Sampling period in seconds. When `None`, it is computed from `Fs`. Pass an explicit value only when your signal has a non-standard sampling period.
+</ParamField>
+
 <ParamField path="save_path" type="str">
-  If provided, the generated bank is written to this HDF5 file path. The file can then be passed as `noisebnk_path` to `execute_pairwise_pipeline()`.
+  If provided, the generated bank is written to this HDF5 file path. The file can then be passed as `noisebnk_path` to `execute_pairwise_pipleine()`.
 </ParamField>
 
 <ParamField path="interp_size" type="tuple or None" default="None">
@@ -317,6 +338,7 @@ noise_metrics_df = giq.compute_noisebnk_metrics(
     max_realizations=100,
     is_hilbertize=1,
     is_normalize_stat=1,
+    is_normalize_entropy=0,
     is_best_features=0,
     metrics_list=None
 )
@@ -344,6 +366,10 @@ noise_metrics_df = giq.compute_noisebnk_metrics(
   Normalize statistical features to `[0, 1]`.
 </ParamField>
 
+<ParamField path="is_normalize_entropy" type="int" default="0">
+  Normalize entropy-based features to `[0, 1]`.
+</ParamField>
+
 <ParamField path="is_best_features" type="int" default="0">
   Return only the top 5 discriminating features. Set to `0` to compute the full feature set for comprehensive noise characterization.
 </ParamField>
@@ -354,6 +380,10 @@ noise_metrics_df = giq.compute_noisebnk_metrics(
 
 <ParamField path="save_path" type="str">
   If provided, the resulting `DataFrame` is saved to this CSV path after each noise group completes, acting as a checkpoint.
+</ParamField>
+
+<ParamField path="verbose" type="int" default="0">
+  Set to `1` to print a progress message to stdout after each noise group finishes processing.
 </ParamField>
 
 ### Returns
