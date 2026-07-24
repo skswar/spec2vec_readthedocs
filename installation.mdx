@@ -25,12 +25,6 @@ The recommended approach is to install Spec2Vec inside a dedicated conda virtual
     ```bash
     conda create -n spec2vec_env python=3.10 numpy=2.2 matplotlib pandas \
         scikit-learn scipy seaborn notebook jupyterlab
-    ```
-  </Step>
-  <Step title="Activate the environment">
-    Switch into your new environment before installing any additional packages.
-
-    ```bash
     conda activate spec2vec_env
     ```
   </Step>
@@ -55,21 +49,39 @@ The recommended approach is to install Spec2Vec inside a dedicated conda virtual
   </Step>
 </Steps>
 
-## Alternative: Install from Requirements File
+## Alternative 1: Install from Requirements File (Recommended)
 
 If you prefer a single command over the step-by-step approach above, you can install all hard dependencies at once using the pinned requirements file included in the repository.
 
 <CodeGroup>
 
 ```bash conda + pip
-conda create -n spec2vec_env python=3.10
+conda create -n spec2vec_env python=3.10.19
 conda activate spec2vec_env
+pip install numpy==2.2.5
+pip install pyfastnoisesimd==0.4.2 --no-build-isolation
 pip install -r software_requirements/spec2vec_requirements_hard.txt
+pip install pyradiomics==3.0.1 --no-build-isolation
 ```
 
 </CodeGroup>
 
 The `spec2vec_requirements_hard.txt` file contains pinned versions for every dependency, which guarantees a reproducible environment identical to the one used during development.
+
+## Alternative 2: Install with [setup.sh](http://setup.sh) file
+
+A [setup.sh](https://github.com/URseismology/Spec2Vec/blob/main/setup.sh) file has been provided in the github repository which can be run after cloning the spec2vec github repository to your local and install the environment.
+
+<CodeGroup>
+
+```bash setup.sh
+bash setup.sh
+conda activate spec2vec_env
+```
+
+</CodeGroup>
+
+Note: Please update the environment name (as per your choice) and the hard requirements file path inside the bash script before proceeding.
 
 ## Verify Your Installation
 
@@ -80,7 +92,7 @@ from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
 print("Spec2Vec ready")
 ```
 
-If you see `Spec2Vec ready` printed without errors, your environment is set up correctly and you are ready to start extracting spectral features.
+If you see `Spec2Vec ready` printed without errors, your environment is set up correctly and you are ready to start extracting signal fingerprint features.
 
 <Note>
   Always launch Jupyter or run Python scripts from the repository root directory (the `Spec2Vec/` folder you cloned). Spec2Vec uses package-relative imports such as `from SPEC2VEC.utils...`, and these resolve only when the repository root is present on your Python path. Launching from a subdirectory will produce `ModuleNotFoundError`.
