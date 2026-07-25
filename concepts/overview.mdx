@@ -11,12 +11,12 @@ Spec2Vec converts raw geophysical signals into compact, interpretable vector emb
 Spec2Vec organises its metric computation into two complementary stages. You can run either stage independently or chain them together depending on how much contextual information you have about the noise environment.
 
 <Steps>
-  <Step title="Stage 1 — Pointwise metrics">
+  <Step title="Stage 1 — Pointwise metrics (for Textural and Statistical Features)">
     Scalar features are extracted directly from a single signal or its spectrogram in isolation. The pipeline flattens the 2D time-frequency representation (TFR) into a 1D trace using a Hilbert space-filling curve to preserve spatial locality, then computes entropy measures, fractal dimensions, and statistical moments on that trace.
 
     **What you get:** a one-row DataFrame of named scalars — permutation entropy, Higuchi fractal dimension, root mean square, Lempel-Ziv complexity, and dozens more — derived entirely from the signal itself, with no external reference needed.
   </Step>
-  <Step title="Stage 2 — Pairwise metrics">
+  <Step title="Stage 2 — Pairwise metrics (for Spatial Features)">
     Spatial features are extracted by comparing the target spectrogram against a pre-built **noise reference bank** — a library of spectrograms from known noise processes (white, pink, red, blue, violet noise, and others). One can also supply their own pre-computed noise reference files. The comparison involves three sub-operations:
 
     1. **Histogram alignment** — the target's amplitude distribution is aligned to the closest noise reference via cross-correlation and optimization, isolating the signal-of-interest from background noise.
