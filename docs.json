@@ -71,9 +71,5 @@
   },
   "appearance": {
     "default": "light"
-  },
-  "logo": {
-    "light": "/logo/MinimalElegantSpec2VecLogo.png",
-    "dark": "/logo/MinimalElegantSpec2VecLogo.png"
   }
 }
