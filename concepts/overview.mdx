@@ -6,6 +6,10 @@ description: "Understand Spec2Vec's two-stage architecture: pointwise (texture a
 
 Spec2Vec converts raw geophysical signals into compact, interpretable vector embeddings by systematically computing a suite of information-theoretic, statistical, and spatial metrics across the signal's time-frequency representation. Rather than relying on a neural network whose internal reasoning is opaque, every number in a Spec2Vec embedding has a name and a physical meaning — making results auditable, reproducible, and portable across datasets without retraining.
 
+<Frame>
+  ![Flowchart](/images/flowchart.jpg "Flowchart")
+</Frame>
+
 ## Two-stage feature extraction
 
 Spec2Vec organises its metric computation into two complementary stages. You can run either stage independently or chain them together depending on how much contextual information you have about the noise environment.
