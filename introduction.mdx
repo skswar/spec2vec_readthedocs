@@ -1,7 +1,7 @@
 ---
 title: "Introduction to Spec2Vec: What It Does and Who It Is For"
 sidebarTitle: "Introduction"
-description: "Spec2Vec extracts physics-aware spectral embeddings from signals. Learn what it does, who it is for, and how it differs from black-box approaches."
+description: "Spec2VEC extracts physics-aware spectral embeddings from signals. Learn what it does, who it is for, and how it differs from black-box approaches."
 ---
 
 Spec2Vec addresses a fundamental challenge in signal analysis: how do you systematically describe what a signal looks like without relying on subjective inspection or opaque neural networks? The framework solves this by computing a reproducible suite of information-theoretic, statistical, and spatial metrics from any 1D time-series or its 2D time-frequency representation, producing a compact feature vector — a "spectral fingerprint" — that you can feed directly into clustering, classification, or dimensionality-reduction workflows.
@@ -21,33 +21,24 @@ Spec2Vec is designed for researchers and practitioners who work with 1D time-ser
 - **Signal processing researchers** who want a reproducible, feature-based baseline for comparing signal types.
 - **Data scientists** working with any domain involving structured 1D or 2D temporal data who value transparency over black-box performance.
 
-If you have a collection of signals that you need to characterize, compare, or group — and you want to understand *why* signals are being grouped the way they are — Spec2Vec is built for you.
+If you have a collection of signals that you need to characterize, compare, or group — and you want to understand _why_ signals are being grouped the way they are — Spec2Vec is built for you.
 
 ## Key Capabilities
 
 <CardGroup cols={2}>
-  <Card
-    title="Pointwise Feature Extraction"
-    icon="chart-bar"
-  >
+  <Card title="Pointwise Feature Extraction" icon="chart-bar">
     Compute entropy, complexity, and statistical features from a single signal or spectrogram image using the `GISQAPipeline.compute_pointwise_metrics_from_spec()` method.
   </Card>
-  <Card
-    title="Pairwise Spatial Metrics"
-    icon="arrows-left-right"
-  >
+
+  <Card title="Pairwise Spatial Metrics" icon="arrows-left-right">
     Compare a target spectrogram against a reference noise bank using histogram alignment, GMM labeling, and gray-level size-zone matrix (GLSZM) texture metrics.
   </Card>
-  <Card
-    title="Spectrogram Generation"
-    icon="image"
-  >
+
+  <Card title="Spectrogram Generation" icon="image">
     Convert raw 1D waveforms into STFT or CWT time-frequency representations using `stft_basic_spectogram()` and `cwt_simple()` from `spectograms_lib.py`.
   </Card>
-  <Card
-    title="Acoustic Modeling"
-    icon="wave-square"
-  >
+
+  <Card title="Acoustic Modeling" icon="wave-square">
     Build synthetic waveforms propagating through complex heterogeneous physical media using the `Simulator` class, powered by `jwave` and `jax` (optional dependency).
   </Card>
 </CardGroup>
