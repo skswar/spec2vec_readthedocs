@@ -56,7 +56,7 @@ The `esec_catalog_clustering/` directory is organized as follows:
 </Steps>
 
 <Tip>
-  **Skip to results immediately:** Pre-computed feature files are already available in `computed_dataset_files/`. If you just want to reproduce the paper figures without downloading or processing any raw data, open `spec2vec_analysis_notebooks/spec2vec_analysis_main.ipynb` directly and run it — Steps 1–3 are entirely optional.
+  **Skip to results immediately:** Pre-computed feature files are already available in [computed\_dataset\_files](https://github.com/URseismology/SPEC2VEC/tree/main/esec_catalog_clustering/computed_dataset_files). If you just want to reproduce the paper figures without downloading or processing any raw data, open `spec2vec_analysis_notebooks/spec2vec_analysis_main.ipynb` directly and run it — Steps 1–3 are entirely optional.
 </Tip>
 
 ## Optional Visualizations
@@ -66,3 +66,7 @@ After completing the core workflow, three additional scripts let you generate de
 - **Reference input figures** — Run `optional_input_figures_ref_prep.py` to generate reference plots of the raw input signals for both the ESEC and tectonic EQ catalogs. Outputs are saved to `esec_spec2vec_ip_figures/` and `eq_spec2vec_ip_figures/` (pre-generated figures are already included in those folders for immediate inspection).
 - **Comprehensive metric plots** — Run `optional_comprehensive_metrics_plots.py` to produce detailed visualizations of every computed Spec2Vec feature, useful for exploratory analysis and feature selection. Outputs are saved to `comprehensive_metrics_plots/`.
 - **Rolling analysis** — Run `optional_esec_spec2vec_rolling_metrics_prep.py` to apply Spec2Vec on a rolling basis over N-second chunks of each time series rather than the full waveform. This sliding-window approach lets you track how spectral fingerprints evolve through an event and is particularly useful for long-duration exotic events such as sustained debris flows.
+
+<Tip>
+  **Skip to results immediately:** The github contains the figures from the processed results in the "[eq\_spec2vec\_ip\_figures](https://github.com/URseismology/SPEC2VEC/tree/main/esec_catalog_clustering/eq_spec2vec_ip_figures)", "[esec\_spec2vec\_ip\_figures](https://github.com/URseismology/SPEC2VEC/tree/main/esec_catalog_clustering/esec_spec2vec_ip_figures)" and "[comprehensive\_metrics\_plots](https://github.com/URseismology/SPEC2VEC/tree/main/esec_catalog_clustering/comprehensive_metrics_plots)" folders for your reference. 
+</Tip>
