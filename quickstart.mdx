@@ -17,6 +17,12 @@ In this guide you will generate two synthetic 1D signals, extract a full set of 
     Start by importing NumPy and the two Spec2Vec modules you will use: the `GISQAPipeline` class for feature extraction and `stft_basic_spectogram` for generating time-frequency representations.
 
     ```python
+    ## Update For Google Colab
+    # sys.path.append('/content/drive/MyDrive/')
+    
+    ## Update For Local
+    sys.path.append('/path/to/my/all_projects') ## e.g. sys.path.append('/data/sswar_files/0_PUBLISHED_CODES')
+    
     import numpy as np
     from SPEC2VEC.utils.gisqa_compute_updated import GISQAPipeline
     from SPEC2VEC.utils.spectograms_lib import stft_basic_spectogram
