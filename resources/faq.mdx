@@ -19,7 +19,7 @@ This page answers the most common questions about setting up and using Spec2Vec,
     </Tip>
   </Accordion>
 
-  <Accordion title="What does `is_hilbertize` do?">
+  <Accordion title="What does \`is\_hilbertize\` do?">
     When you set `is_hilbertize=1`, Spec2Vec flattens your 2D spectrogram into a 1D array using a [Hilbert curve](https://en.wikipedia.org/wiki/Hilbert_curve) before computing pointwise features. A Hilbert curve is a space-filling fractal path that visits every cell of a 2D grid exactly once while preserving spatial locality — pixels that are close in 2D remain close in the flattened 1D array.
 
     This step is **required** when your input is a 2D spectrogram image, because the underlying feature extractors (`antropy`, `ordpy`, `tsfel`) operate on 1D arrays. For direct 1D time-series input you can set `is_hilbertize=0`.
@@ -49,7 +49,7 @@ This page answers the most common questions about setting up and using Spec2Vec,
     </Tip>
   </Accordion>
 
-  <Accordion title="What are `ordpydx` and `antropydx`?">
+  <Accordion title="What are \`ordpydx\` and \`antropydx\`?">
     These parameters set the **embedding dimension** for two families of entropy and complexity estimators:
 
     - **`ordpydx`** controls the embedding dimension used by `ordpy`-based features (permutation entropy, statistical complexity, Fisher–Shannon information, and Rényi/Tsallis variants).
@@ -112,7 +112,7 @@ This page answers the most common questions about setting up and using Spec2Vec,
     The pipeline API is identical regardless of your domain. Simply pass your signals to `compute_pointwise_metrics_from_spec()` as you would with any seismic waveform.
   </Accordion>
 
-  <Accordion title="What does `is_best_features=1` return?">
+  <Accordion title="What does \`is\_best\_features=1\` return?">
     When you set `is_best_features=1`, Spec2Vec returns only the **5 most discriminating features** identified in the Spec2Vec research rather than the full feature set:
 
     | Feature | Source library |
@@ -138,7 +138,7 @@ This page answers the most common questions about setting up and using Spec2Vec,
     </Tip>
   </Accordion>
 
-  <Accordion title="I get an import error for `jwave` or `jax`. How do I fix it?">
+  <Accordion title="I get an import error for \`jwave\` or \`jax\`. How do I fix it?">
     `jwave` and `jax` are **optional dependencies** used exclusively by the acoustic wave propagation modeling module (`acoustic_signal_modeling/`). They are not required for core Spec2Vec feature extraction.
 
     If you need them, install them with:
